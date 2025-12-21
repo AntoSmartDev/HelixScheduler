@@ -1,3 +1,10 @@
 <Solution>
-  <Project Path="HelixScheduler/HelixScheduler.csproj" />
+  <Folder Name="/samples/">
+    <Project Path="HelixScheduler.Samples.Medical/HelixScheduler.Samples.Medical.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="HelixScheduler.Core/HelixScheduler.Core.csproj" />
+    <Project Path="HelixScheduler.Infrastructure/HelixScheduler.Infrastructure.csproj" />
+    <Project Path="HelixScheduler/HelixScheduler.WebApi.csproj" />
+  </Folder>
 </Solution>

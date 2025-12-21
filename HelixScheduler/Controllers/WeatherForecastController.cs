@@ -1,6 +1,7 @@
+
 using Microsoft.AspNetCore.Mvc;
 
-namespace HelixScheduler.Controllers
+namespace HelixScheduler.WebApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]

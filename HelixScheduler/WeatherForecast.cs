@@ -1,4 +1,4 @@
-namespace HelixScheduler
+namespace HelixScheduler.WebApi
 {
     public class WeatherForecast
     {
