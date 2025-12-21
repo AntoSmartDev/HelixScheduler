@@ -1,29 +1,25 @@
 # Architecture
 
-## Macro-componenti
-1) Scheduler Core
-- Algoritmi di calcolo slot
-- Intersezioni disponibilità risorse
-- Risoluzione conflitti
-- Output: lista slot disponibili (con metadati minimi)
+## Componenti principali
 
-2) Domain Adapters
-- Trasforma eventi/entità di dominio in input scheduler
-- Normalizzazione: indisponibilità, prenotazioni, vincoli
+### Scheduler Core
+- calcolo disponibilità
+- gestione regole e BusySlot
+- intersezioni multi-risorsa
+- completamente agnostico dal dominio
 
-3) Persistence/Infrastructure (facoltativo)
-- repository, caching, storage
-- MAI “mescolare” query DB con hot-path del core
+### Domain Adapter (esterno)
+- trasforma eventi reali in BusySlot
+- filtra e seleziona risorse
+- NON vive nel core
+
+### Infrastructure / API
+- DB, EF, Web API
+- completamente separati
 
 ## Boundary
-- Scheduler Core non conosce DB, HTTP, UI.
-- Scheduler Core riceve dati già normalizzati e coerenti.
-
-## Tipi di input
-- Availability windows (per risorsa)
-- Busy intervals (prenotazioni)
-- Negative events (blocchi, ferie, manutenzione)
-- Constraints (hard/soft) — definire evoluzione in ADR quando introdotti
-
-## Evoluzione
-Ogni scelta che cambia boundary o modello dei dati -> ADR.
+Il core NON conosce:
+- DB
+- HTTP
+- Identity
+- UI

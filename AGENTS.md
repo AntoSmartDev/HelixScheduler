@@ -1,57 +1,83 @@
-# HelixScheduler ó Agent Instructions (AGENTS.md)
+Ôªø# AGENTS.md ‚Äî HelixScheduler
 
-## 0. Obiettivo
-Questo repository contiene **HelixScheduler**, un motore di scheduling ottimizzato per scenari con decine/centinaia di risorse e range di giorni/settimane.
-Obiettivi primari:
-- correttezza delle disponibilit‡ e vincoli (risorse, regole, conflitti)
-- performance (CPU/RAM) e prevedibilit‡ dei costi
-- separazione netta tra **motore di calcolo** e **eventi/regole di dominio**
-- codebase pulita, modulare, testabile
+## Ruolo dell‚Äôagente
+Stai lavorando su **HelixScheduler**, un motore di scheduling **agnostico dal dominio**.
+Il tuo compito √® implementare un core deterministico, testabile e performante,
+aderendo rigorosamente al modello concettuale documentato.
 
-## 1. Contesto canonico (obbligatorio)
-Prima di qualunque modifica strutturale o decisione architetturale, considera questi documenti come fonte di verit‡:
+NON devi:
+- introdurre logica di dominio applicativo
+- interpretare casi d‚Äôuso specifici (medico, prenotazioni, ecc.)
+- costruire UI, calendari o flussi applicativi
+
+DEVI:
+- rispettare il modello concettuale
+- mantenere separazione netta motore ‚Üî dominio
+- privilegiare chiarezza e prevedibilit√†
+
+---
+
+## Documenti canonici (OBBLIGATORI)
+Prima di qualsiasi modifica, considera **fonte di verit√†**:
+
 - docs/context/PROJECT.md
 - docs/context/ARCHITECTURE.md
-- docs/context/DOMAIN.md
+- docs/context/DOMAIN_MODEL.md
+- docs/context/SCHEDULING_MODEL.md
+- docs/context/QUERY_MODEL.md
+- docs/context/PIPELINE.md
 - docs/context/PERFORMANCE.md
 - docs/context/SECURITY_MODEL.md
 - docs/context/GLOSSARY.md
 
-Se un task tocca uno degli argomenti sopra, **rileggi** i documenti pertinenti.
+Se una modifica √® in conflitto ‚Üí fermati e proponi ADR.
 
-## 2. Regole non negoziabili
-- Non introdurre dipendenze pesanti senza motivazione e impatto misurabile.
-- Evita allocazioni inutili, LINQ in hot-path, enumerazioni multiple: preferisci approcci efficienti.
-- Mantieni separazione tra:
-  - Scheduler Core (algoritmi, calcolo slot, risoluzione conflitti)
-  - Domain Events/Adapters (trasformazione eventi di dominio in input normalizzati per lo scheduler)
-- Non cambiare API pubbliche senza motivazione e senza aggiornare documentazione + changelog.
-- Ogni modifica significativa deve includere test (unit o integration) e aggiornamento docs se necessario.
+---
 
-## 3. Output atteso per ogni task
-Quando proponi cambiamenti, segui questo formato:
-1) **Piano breve** (2ñ6 punti)
-2) **Modifiche** (file toccati + rationale)
-3) **Rischi/edge cases**
-4) **Come verificare** (comandi/test, esempi)
-5) Se il task Ë ìgrandeî: crea una nota in docs/adr/ o un log in docs/codex/
+## Regole non negoziabili
 
-## 4. Convenzioni di lavoro
-- Lavorare su branch dedicato (es. feature/*, refactor/*, fix/*).
-- Preferire PR piccole e revisionabili.
-- Se un task richiede una scelta architetturale, creare ADR:
-  - docs/adr/ADR-XXXX-<titolo>.md (vedi docs/adr/ADR-TEMPLATE.md)
+- Tutto il core lavora **solo in UTC**
+- Nessuna dipendenza da:
+  - EF / DB
+  - HTTP / Web
+  - dominio applicativo
+- Regole scheduler: poche, strutturali
+- Eventi di dominio: molti, sempre normalizzati come BusySlot
+- Disponibilit√† calcolata:
+  1. per singola risorsa
+  2. poi intersezione
 
-## 5. Standard qualit‡
-- Test: aggiungere o aggiornare test quando si cambia comportamento.
-- Naming: chiaro, consistente, coerente con il dominio.
-- Logging: solo dove utile e senza inquinare hot-path.
-- Sicurezza: non loggare dati sensibili, validare input, evitare DoS accidentali.
+Un evento multi-risorsa NON √® mai monolitico.
 
-## 6. Incertezza
-Se manca uníinformazione essenziale nel contesto canonico, non inventare:
-- fai la migliore assunzione ragionevole
-- rendila esplicita nel piano
-- aggiungi un TODO nei documenti (o un ADR)
-- con ìda confermareî
+---
 
+## Semantica fondamentale
+
+Per ogni risorsa R:
+
+Disponibilit√†(R) =
+  regole positive(R)
+  ‚àí regole negative(R)
+  ‚àí BusySlot(R)
+
+Solo dopo si applica l‚Äôintersezione tra risorse richieste.
+
+---
+
+## Performance
+- target: decine/centinaia risorse
+- range: giorni/settimane (max ~3 mesi)
+- evitare algoritmi ‚Äúfurbi‚Äù
+- no cache / no pre-calcolo globale
+- pipeline leggibile, step-by-step
+
+---
+
+## Output richiesto per ogni task
+1. Piano sintetico
+2. File toccati
+3. Impatto sul modello
+4. Rischi / edge case
+5. Come verificare
+
+Task strutturali ‚Üí ADR o log in docs/codex/

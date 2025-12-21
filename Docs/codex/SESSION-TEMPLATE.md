@@ -1,21 +1,19 @@
-# Codex Session — YYYY-MM-DD — <Short title>
+# Codex Session — YYYY-MM-DD
 
 ## Goal
 ...
 
 ## Changes
-- File1:
-- File2:
+- File:
 
 ## Decisions
-- ...
+...
 
-## Risks / Edge cases
-- ...
+## Risks
+...
 
 ## How to verify
-- dotnet test
-- sample scenario: ...
+...
 
-## Follow-ups
-- TODO:
+## Follow-up
+...

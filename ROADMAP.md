@@ -1,11 +1,10 @@
 # Roadmap
 
-## v0.x (foundations)
-- Interval model + normalization pipeline
-- Multi-resource intersection
-- Query API
-- Baseline benchmarks
+## v1
+- core engine
+- multi-risorsa
+- pipeline completa
 
-## v1.0
-- Stability, documentation, extension points
-- Security limits and guardrails
+## v2
+- capacity
+- semantiche OR

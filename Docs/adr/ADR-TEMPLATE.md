@@ -1,19 +1,19 @@
-# ADR-XXXX: <Title>
+# ADR-XXXX — Titolo
 
 ## Status
 Proposed | Accepted | Deprecated
 
 ## Context
-What problem are we solving? What constraints exist?
+Problema da risolvere
 
 ## Decision
-What did we decide?
+Scelta effettuata
 
 ## Consequences
-Positive / Negative / Risks
+Pro / Contro / Rischi
 
-## Alternatives considered
-List alternatives and why rejected.
+## Alternatives
+Opzioni scartate
 
 ## Validation
-How do we test/measure this decision?
+Come verificare

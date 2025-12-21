@@ -1,16 +1,11 @@
-# Performance & Cost Model
+# Performance Model
 
-## Scenario target
-- decine/centinaia di risorse
-- range giorni/settimane
-- hot-path: calcolo slot per query utente
+Target:
+- decine / centinaia di risorse
+- range limitato (giorni/settimane)
 
-## Regole pratiche
-- evitare LINQ in percorsi caldi se crea allocazioni o enumerazioni multiple
-- preferire strutture dati efficienti (liste ordinate di intervalli, sweep-line, ecc.)
-- ridurre oggetti temporanei: valutare pooling solo se misurato
-- ogni ottimizzazione deve essere accompagnata da benchmark o almeno test prestazionali ripetibili
-
-## Definition of Done (perf)
-- Non peggiorare memoria e tempo in modo evidente
-- Se introduce complessità, documentare tradeoff (ADR)
+Linee guida:
+- evitare LINQ in hot-path
+- evitare allocazioni inutili
+- niente cache prematura
+- pipeline misurabile e debug-friendly
