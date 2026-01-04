@@ -1,10 +1,94 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Availability";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="row g-4">
+    <div class="col-lg-5">
+        <h1 class="h3 mb-3">Availability check</h1>
+        <form method="post" class="card shadow-sm">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label asp-for="FromDate" class="form-label">From date (UTC)</label>
+                    <input asp-for="FromDate" type="date" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ToDate" class="form-label">To date (UTC)</label>
+                    <input asp-for="ToDate" type="date" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <div class="form-label">Resources</div>
+                    @for (var i = 0; i < Model.ResourceGroups.Count; i++)
+                    {
+                        var group = Model.ResourceGroups[i];
+                        <input type="hidden" name="ResourceGroups[@i].Name" value="@group.Name" />
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="ResourceGroups[@i].IsActive" value="true" checked="@(group.IsActive ? "checked" : null)" id="group-@i" />
+                            <input type="hidden" name="ResourceGroups[@i].IsActive" value="false" />
+                            <label class="form-check-label" for="group-@i">@group.Name filter</label>
+                        </div>
+                        <div class="ms-3 mb-3">
+                            @foreach (var option in group.Options)
+                            {
+                                var isChecked = group.SelectedIds.Contains(option.Id);
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="ResourceGroups[@i].SelectedIds" value="@option.Id" id="resource-@i-@option.Id" checked="@(isChecked ? "checked" : null)" />
+                                    <label class="form-check-label" for="resource-@i-@option.Id">@option.Label</label>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Check availability</button>
+                    <button type="submit" class="btn btn-outline-secondary" name="UseDemo" value="true">Use demo range</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="col-lg-7">
+        <h2 class="h5 mb-3">Results</h2>
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger">@Model.ErrorMessage</div>
+        }
+        else if (Model.Slots.Count > 0)
+        {
+            var grouped = Model.Slots
+                .GroupBy(slot => slot.StartUtc.Date)
+                .OrderBy(group => group.Key);
+
+            foreach (var group in grouped)
+            {
+                <div class="mb-3">
+                    <div class="fw-semibold text-muted">@group.Key:yyyy-MM-dd (ddd)</div>
+                    <ul class="list-group">
+                        @foreach (var slot in group)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@slot.RangeLabel</span>
+                                <span class="badge bg-secondary">UTC</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.InfoMessage))
+        {
+            <div class="alert alert-secondary">@Model.InfoMessage</div>
+        }
+        else
+        {
+            <p class="text-muted">Select inputs and run a search.</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.ApiRequestUrl))
+        {
+            <div class="mt-3">
+                <div class="small text-muted">API call used</div>
+                <a href="@Model.ApiRequestUrl" target="_blank" rel="noreferrer">@Model.ApiRequestUrl</a>
+            </div>
+        }
+    </div>
 </div>

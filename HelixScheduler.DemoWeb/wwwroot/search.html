@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HelixScheduler Search</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg">
+    <div class="grain"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+  </div>
+  <header class="header">
+    <div class="title-block">
+      <div class="eyebrow">HelixScheduler</div>
+      <h1>Search Availability</h1>
+      <p class="subtitle">Search mode: find availability by type + property filters (UTC).</p>
+    </div>
+    <div class="actions">
+      <nav class="nav">
+        <a class="nav-link" href="/">Availability Explorer</a>
+        <a class="nav-link active" href="/search">Search Availability</a>
+      </nav>
+    </div>
+  </header>
+
+  <div id="apiStatus" class="status-bar waiting">
+    <span class="spinner"></span>
+    <span id="apiStatusMessage">Waiting for API...</span>
+    <button id="apiRetry" class="btn ghost">Retry now</button>
+  </div>
+
+  <main class="layout">
+    <aside class="panel">
+      <div class="panel-section">
+        <h2>Week <span id="weekLabel" class="week-label inline"></span></h2>
+        <div class="week-controls">
+          <button id="prevWeek" class="btn">Prev</button>
+          <button id="nextWeek" class="btn">Next</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>Query Resources (AND)</h2>
+        <div id="requirements" class="requirement-grid">Loading...</div>
+        <div class="divider"></div>
+        <button id="addRequirement" class="btn">+ Add resource type</button>
+      </div>
+
+      <div class="panel-section">
+        <h2>Options</h2>
+        <label class="toggle">
+          <input type="checkbox" id="toggleExplain" checked />
+          <span>Explain availability</span>
+        </label>
+        <div class="search-actions">
+          <button id="computeSearch" class="btn primary">Compute availability</button>
+          <button id="resetSearch" class="btn">Reset builder</button>
+        </div>
+        <div id="searchError" class="microcopy"></div>
+      </div>
+    </aside>
+
+    <section class="panel wide">
+      <div class="section-header">
+        <h2>Availability (UTC)</h2>
+        <div class="legend">
+          <span class="pill">Slots</span>
+          <span class="pill light">Busy</span>
+          <span id="computeStatus" class="pill badge">Waiting</span>
+        </div>
+      </div>
+      <p class="microcopy">Computed availability from rules after subtracting busy intervals.</p>
+      <p class="microcopy">Slots can include contributions from multiple rules.</p>
+      <div class="flow-note">
+        <div><strong>How availability is computed</strong></div>
+        <div>1) Rules generate candidate windows per resource.</div>
+        <div>2) Windows are intersected across required resources.</div>
+        <div>3) Busy intervals remove or split candidates into final slots.</div>
+      </div>
+      <div id="searchSummary" class="query-summary">Waiting for query.</div>
+      <div id="calendar" class="calendar"></div>
+
+      <div class="section-header">
+        <h2>Busy Calendar (UTC)</h2>
+      </div>
+      <p id="busyNote" class="microcopy">Busy intervals that remove or split availability.</p>
+      <div id="busyCalendar" class="calendar busy"></div>
+
+      <div class="divider"></div>
+
+      <div class="section-header">
+        <h2>Rules</h2>
+      </div>
+      <p class="microcopy">A rule can contribute to many slots; a slot can have multiple contributing rules.</p>
+      <div id="ruleImpactInfo" class="selection-info">Click a rule to see how many slots it contributes to.</div>
+      <div id="rules" class="stacked">No compute yet.</div>
+
+      <div class="section-header">
+        <h2>Busy Slots</h2>
+      </div>
+      <div id="busy" class="stacked">No compute yet.</div>
+
+      <div class="section-header">
+        <h2>Explain</h2>
+      </div>
+      <div id="explain" class="stacked">Explain disabled.</div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-card">
+      <div class="footer-left">HelixScheduler Demo</div>
+      <div class="footer-center">© <span id="year"></span> HelixScheduler</div>
+      <div class="footer-right"></div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+  <script src="search.js"></script>
+</body>
+</html>

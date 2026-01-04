@@ -1,19 +1,20 @@
-# HelixScheduler — Project Overview
+# HelixScheduler ï¿½ Project Overview
 
-HelixScheduler è un motore di scheduling agnostico dal dominio che calcola
-slot di disponibilità su una o più risorse applicando:
+HelixScheduler ï¿½ un motore di scheduling agnostico dal dominio che calcola
+slot di disponibilitï¿½ su una o piï¿½ risorse applicando:
 - regole positive e negative
 - eventi di dominio normalizzati
 - gerarchie di risorse
-- filtri per proprietà
+- filtri per proprietï¿½
 
-Non è un calendario, non è un gestionale, non è un framework UI.
+Non ï¿½ un calendario, non ï¿½ un gestionale, non ï¿½ un framework UI.
 
 ## Obiettivi
 - core deterministico e testabile
 - riutilizzabile in domini diversi
 - performance prevedibili
 - modello semplice ed estensibile
+- API surface chiara e coerente (vedi docs/context/API_SURFACE.md)
 
 ## Non-obiettivi
 - persistenza eventi di dominio

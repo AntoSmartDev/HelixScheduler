@@ -1,10 +1,19 @@
 <Solution>
   <Folder Name="/samples/">
     <Project Path="HelixScheduler.Samples.Medical/HelixScheduler.Samples.Medical.csproj" />
+    <Project Path="HelixScheduler.DemoWeb/HelixScheduler.DemoWeb.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="HelixScheduler.Benchmarks/HelixScheduler.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="HelixScheduler.Core/HelixScheduler.Core.csproj" />
+    <Project Path="HelixScheduler.Core.Tests/HelixScheduler.Core.Tests.csproj" />
+    <Project Path="src/HelixScheduler.Application/HelixScheduler.Application.csproj" />
     <Project Path="HelixScheduler.Infrastructure/HelixScheduler.Infrastructure.csproj" />
     <Project Path="HelixScheduler/HelixScheduler.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="HelixScheduler.WebApi.Tests/HelixScheduler.WebApi.Tests.csproj" />
   </Folder>
 </Solution>

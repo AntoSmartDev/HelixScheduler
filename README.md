@@ -1,10 +1,68 @@
-﻿# HelixScheduler
+# HelixScheduler
 
-A domain-agnostic scheduling engine for multi-resource availability.
+HelixScheduler is a domain-agnostic scheduling engine for multi-resource availability.
 
 ## Key ideas
-- availability = positive − negative
-- per-resource computation
-- intersection last
+- availability = positive - negative
+- per-resource computation, intersection last
+- core runs in UTC only
 
-See docs/context for full model.
+## Domain = Core
+The domain model of the engine lives in `HelixScheduler.Core` (model + invariants + deterministic algorithm).
+It has no EF/HTTP dependencies and remains application-agnostic.
+
+## DaysOfWeekMask
+Weekly rules use a bitmask for active days (System.DayOfWeek):
+- 1 = Sunday, 2 = Monday, 4 = Tuesday, 8 = Wednesday
+- 16 = Thursday, 32 = Friday, 64 = Saturday
+Example: 10 = 2 + 8 = Monday + Wednesday.
+
+Why a bitmask:
+- compact storage (single int)
+- fast filtering (bitwise AND)
+- simple serialization/interoperability
+
+See `docs/context` for the canonical model.
+
+## Quickstart (SQL Server)
+Set configuration:
+```
+HelixScheduler__DatabaseProvider=SqlServer
+ConnectionStrings__SchedulerDb=Server=.\SQLEXPRESS;Database=HelixScheduler;Trusted_Connection=True;TrustServerCertificate=True;
+```
+Start the API:
+```
+dotnet run --project HelixScheduler
+```
+Start the demo UI:
+```
+dotnet run --project HelixScheduler.DemoWeb
+```
+Open the demo:
+```
+https://localhost:7040
+```
+
+The API seeds a demo scenario relative to install (BaseDateUtc persisted). Reset is dev-only:
+```
+POST /api/demo/reset
+```
+
+Note: SQLite support is temporarily disabled.
+
+## Recent updates
+- DemoWeb waits for API readiness (health check + retry/backoff).
+- WebApi exposes `/health` with status/utc/version and has a simple landing page.
+
+## WebApi endpoints
+- `POST /api/availability/compute` (canonical)
+- `GET /api/availability/slots` (legacy querystring)
+- `POST /api/demo/summary` (rules + busy slots for demo UI)
+- `POST /api/demo/reset` (Development only)
+- `GET /api/resources`
+
+## DemoWeb
+The read-only UI shows:
+- weekly availability calendar
+- rule list and busy slots
+- explain toggle (if enabled)

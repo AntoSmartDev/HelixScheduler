@@ -2,6 +2,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+var apiBaseUrl = builder.Configuration.GetValue<string>("AvailabilityApi:BaseUrl") ?? "http://localhost:5063";
+builder.Services.AddHttpClient("AvailabilityApi", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+});
 
 var app = builder.Build();
 

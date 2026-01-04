@@ -1,10 +1,10 @@
 # Roadmap
 
-## v1
-- core engine
-- multi-risorsa
-- pipeline completa
+## Near term
+- Capacity v2 (assignment)
+- Explainability v2 (richer diagnostics)
+- Demo scenarios expansion
 
-## v2
-- capacity
-- semantiche OR
+## Later
+- Additional query modes
+- Performance micro-optimizations

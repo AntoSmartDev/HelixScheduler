@@ -8,6 +8,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HelixScheduler.Core\HelixScheduler.Core.csproj" />
+    <ProjectReference Include="..\HelixScheduler.Infrastructure\HelixScheduler.Infrastructure.csproj" />
+    <ProjectReference Include="..\src\HelixScheduler.Application\HelixScheduler.Application.csproj" />
   </ItemGroup>
 
 </Project>
