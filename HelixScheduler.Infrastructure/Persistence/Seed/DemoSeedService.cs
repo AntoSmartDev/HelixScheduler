@@ -7,7 +7,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Seed;
 
 public sealed class DemoSeedService : IDemoSeedService
 {
-    private const int SeedVersion = 2;
+    private const int SeedVersion = 3;
     private readonly SchedulerDbContext _dbContext;
     private readonly IDemoScenarioStore _store;
     private readonly IClock _clock;
@@ -43,10 +43,10 @@ public sealed class DemoSeedService : IDemoSeedService
     private async Task ApplySeedAsync(DateOnly baseDateUtc, CancellationToken ct)
     {
         var nowUtc = _clock.UtcNow;
-        await NormalizePropertyKeysAsync(ct).ConfigureAwait(false);
-        await NormalizePropertyLabelsAsync(ct).ConfigureAwait(false);
-        await CleanupPropertyDuplicatesAsync(ct).ConfigureAwait(false);
-        await CleanupPropertyLinkDuplicatesAsync(ct).ConfigureAwait(false);
+        await CleanupDemoRulesAndBusyAsync(ct).ConfigureAwait(false);
+        await CleanupDemoPropertyTreeAsync(ct).ConfigureAwait(false);
+        await CleanupDemoPropertyLinksAsync(ct).ConfigureAwait(false);
+        await CleanupDemoTypeMappingsAsync(ct).ConfigureAwait(false);
 
         var siteType = await EnsureResourceTypeAsync("Site", "Site", 1, ct);
         var roomType = await EnsureResourceTypeAsync("Room", "Room", 2, ct);
@@ -125,17 +125,6 @@ public sealed class DemoSeedService : IDemoSeedService
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(doctor8Rule.Id, doctor8.Id, ct);
-
-        var doctor8BackupRule = await EnsureWeeklyRuleAsync(
-            "Demo: Doctor 8 backup availability",
-            new TimeOnly(14, 0),
-            new TimeOnly(18, 0),
-            mondayWednesday,
-            baseDateUtc,
-            periodEnd,
-            nowUtc,
-            ct);
-        await EnsureRuleResourceAsync(doctor8BackupRule.Id, doctor8.Id, ct);
 
         var room3Rule = await EnsureWeeklyRuleAsync(
             "Demo: Room 3 availability",
@@ -459,94 +448,76 @@ public sealed class DemoSeedService : IDemoSeedService
         }
     }
 
-    private Task CleanupPropertyLinkDuplicatesAsync(CancellationToken ct)
+    private Task CleanupDemoRulesAndBusyAsync(CancellationToken ct)
     {
         return _dbContext.Database.ExecuteSqlRawAsync(
             """
-            WITH cte AS (
-                SELECT ResourceId,
-                       PropertyId,
-                       ROW_NUMBER() OVER (PARTITION BY ResourceId, PropertyId ORDER BY ResourceId) AS rn
-                FROM ResourcePropertyLinks
-            )
-            DELETE FROM cte WHERE rn > 1;
+            DELETE rr
+            FROM RuleResources rr
+            INNER JOIN Rules r ON rr.RuleId = r.Id
+            WHERE r.Title LIKE 'Demo:%';
+
+            DELETE FROM Rules WHERE Title LIKE 'Demo:%';
+
+            DELETE ber
+            FROM BusyEventResources ber
+            INNER JOIN BusyEvents b ON ber.BusyEventId = b.Id
+            WHERE b.Title LIKE 'Demo:%';
+
+            DELETE FROM BusyEvents WHERE Title LIKE 'Demo:%';
             """,
             ct);
     }
 
-    private Task CleanupPropertyDuplicatesAsync(CancellationToken ct)
+    private Task CleanupDemoPropertyTreeAsync(CancellationToken ct)
     {
         return _dbContext.Database.ExecuteSqlRawAsync(
             """
-            WITH props AS (
-                SELECT Id,
-                       [Key],
-                       Label,
-                       ParentId,
-                       MIN(Id) OVER (PARTITION BY [Key], Label, ParentId) AS CanonicalId,
-                       ROW_NUMBER() OVER (PARTITION BY [Key], Label, ParentId ORDER BY Id) AS rn
-                FROM ResourceProperties
-            )
             DELETE rpl
             FROM ResourcePropertyLinks rpl
-            INNER JOIN props p ON rpl.PropertyId = p.Id
-            WHERE p.rn > 1
-              AND EXISTS (
-                  SELECT 1
-                  FROM ResourcePropertyLinks rpl2
-                  WHERE rpl2.ResourceId = rpl.ResourceId
-                    AND rpl2.PropertyId = p.CanonicalId
-              );
+            INNER JOIN ResourceProperties p ON rpl.PropertyId = p.Id
+            WHERE p.[Key] IN ('Specialization', 'RoomFeature')
+               OR EXISTS (
+                    SELECT 1
+                    FROM ResourceProperties parent
+                    WHERE parent.Id = p.ParentId
+                      AND parent.[Key] IN ('Specialization', 'RoomFeature')
+               );
 
-            WITH props AS (
-                SELECT Id,
-                       [Key],
-                       Label,
-                       ParentId,
-                       MIN(Id) OVER (PARTITION BY [Key], Label, ParentId) AS CanonicalId,
-                       ROW_NUMBER() OVER (PARTITION BY [Key], Label, ParentId ORDER BY Id) AS rn
-                FROM ResourceProperties
-            )
-            UPDATE rpl
-            SET PropertyId = p.CanonicalId
+            DELETE p
+            FROM ResourceProperties p
+            WHERE p.[Key] IN ('Specialization', 'RoomFeature')
+               OR EXISTS (
+                    SELECT 1
+                    FROM ResourceProperties parent
+                    WHERE parent.Id = p.ParentId
+                      AND parent.[Key] IN ('Specialization', 'RoomFeature')
+               );
+            """,
+            ct);
+    }
+
+    private Task CleanupDemoTypeMappingsAsync(CancellationToken ct)
+    {
+        return _dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DELETE rtp
+            FROM ResourceTypeProperties rtp
+            INNER JOIN ResourceTypes rt ON rtp.ResourceTypeId = rt.Id
+            WHERE rt.[Key] IN ('Doctor', 'Room');
+            """,
+            ct);
+    }
+
+    private Task CleanupDemoPropertyLinksAsync(CancellationToken ct)
+    {
+        return _dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DELETE rpl
             FROM ResourcePropertyLinks rpl
-            INNER JOIN props p ON rpl.PropertyId = p.Id
-            WHERE p.rn > 1;
-
-            WITH props AS (
-                SELECT Id,
-                       ROW_NUMBER() OVER (PARTITION BY [Key], Label, ParentId ORDER BY Id) AS rn
-                FROM ResourceProperties
-            )
-            DELETE FROM props WHERE rn > 1;
-            """,
-            ct);
-    }
-
-    private Task NormalizePropertyKeysAsync(CancellationToken ct)
-    {
-        return _dbContext.Database.ExecuteSqlRawAsync(
-            """
-            UPDATE child
-            SET [Key] = parent.[Key]
-            FROM ResourceProperties child
-            INNER JOIN ResourceProperties parent ON child.ParentId = parent.Id
-            WHERE child.ParentId IS NOT NULL
-              AND child.[Key] <> parent.[Key];
-            """,
-            ct);
-    }
-
-    private Task NormalizePropertyLabelsAsync(CancellationToken ct)
-    {
-        return _dbContext.Database.ExecuteSqlRawAsync(
-            """
-            UPDATE child
-            SET Label = 'Ophthalmology'
-            FROM ResourceProperties child
-            INNER JOIN ResourceProperties parent ON child.ParentId = parent.Id
-            WHERE parent.[Key] = 'Specialization'
-              AND child.Label = 'Oculistica';
+            INNER JOIN Resources r ON rpl.ResourceId = r.Id
+            WHERE r.Code IN ('SITE-A', 'ROOM-1', 'ROOM-2', 'ROOM-3', 'DOC-7', 'DOC-8')
+               OR r.Name IN ('Site A', 'Room 1', 'Room 2', 'Room 3', 'Doctor 7', 'Doctor 8');
             """,
             ct);
     }
