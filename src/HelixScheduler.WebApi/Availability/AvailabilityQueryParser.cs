@@ -1,6 +1,6 @@
-using System.Globalization;
+﻿using System.Globalization;
 
-namespace HelixScheduler.Availability;
+namespace HelixScheduler.WebApi.Availability;
 
 public sealed class AvailabilityQueryParser
 {
@@ -130,3 +130,4 @@ public sealed class AvailabilityQueryParser
         return true;
     }
 }
+

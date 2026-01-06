@@ -1,6 +1,6 @@
-using HelixScheduler.Application.Availability;
+﻿using HelixScheduler.Application.Availability;
 
-namespace HelixScheduler.Availability;
+namespace HelixScheduler.WebApi.Availability;
 
 public sealed class AvailabilityQueryValidator
 {
@@ -115,3 +115,4 @@ public sealed class AvailabilityQueryValidator
         return false;
     }
 }
+

@@ -1,5 +1,5 @@
-using HelixScheduler.Infrastructure;
-using HelixScheduler.Extensions;
+﻿using HelixScheduler.Infrastructure;
+using HelixScheduler.WebApi.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,3 +63,4 @@ app.MapGet("/", () =>
 app.MapControllers();
 
 app.Run();
+

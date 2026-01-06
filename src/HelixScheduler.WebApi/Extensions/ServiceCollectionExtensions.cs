@@ -1,4 +1,4 @@
-using HelixScheduler.Application.Abstractions;
+﻿using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.PropertySchema;
@@ -6,7 +6,7 @@ using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Core;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HelixScheduler.Extensions;
+namespace HelixScheduler.WebApi.Extensions;
 
 public static class ServiceCollectionExtensions
 {
@@ -22,3 +22,4 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+

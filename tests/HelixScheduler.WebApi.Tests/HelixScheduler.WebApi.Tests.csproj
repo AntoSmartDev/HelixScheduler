@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HelixScheduler\HelixScheduler.WebApi.csproj" />
+    <ProjectReference Include="..\..\src\HelixScheduler.WebApi\HelixScheduler.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-namespace HelixScheduler.Availability;
+﻿namespace HelixScheduler.WebApi.Availability;
 
 public sealed class AvailabilitySlotsQuery
 {
@@ -10,3 +10,4 @@ public sealed class AvailabilitySlotsQuery
     public bool Explain { get; init; }
     public bool IncludeDescendants { get; init; }
 }
+

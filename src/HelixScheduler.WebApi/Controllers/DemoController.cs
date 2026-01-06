@@ -1,7 +1,7 @@
-using HelixScheduler.Application.Demo;
+﻿using HelixScheduler.Application.Demo;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HelixScheduler.Controllers;
+namespace HelixScheduler.WebApi.Controllers;
 
 [ApiController]
 [Route("api/demo")]
@@ -49,3 +49,4 @@ public sealed class DemoController : ControllerBase
         return NoContent();
     }
 }
+

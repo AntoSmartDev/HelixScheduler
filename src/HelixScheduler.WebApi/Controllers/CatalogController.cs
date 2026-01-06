@@ -1,8 +1,8 @@
-using HelixScheduler.Application.PropertySchema;
+﻿using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HelixScheduler.Controllers;
+namespace HelixScheduler.WebApi.Controllers;
 
 [ApiController]
 [Route("api/catalog")]
@@ -47,3 +47,4 @@ public sealed class CatalogController : ControllerBase
         return Ok(schema);
     }
 }
+

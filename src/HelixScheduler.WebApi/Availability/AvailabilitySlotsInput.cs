@@ -1,4 +1,4 @@
-namespace HelixScheduler.Availability;
+﻿namespace HelixScheduler.WebApi.Availability;
 
 public sealed record AvailabilitySlotsInput(
     DateOnly FromDate,
@@ -8,3 +8,4 @@ public sealed record AvailabilitySlotsInput(
     List<List<int>> OrGroups,
     bool IncludeDescendants,
     bool Explain);
+

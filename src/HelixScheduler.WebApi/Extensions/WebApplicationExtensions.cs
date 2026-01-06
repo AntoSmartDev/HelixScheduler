@@ -1,7 +1,7 @@
-using HelixScheduler.Application.Startup;
+﻿using HelixScheduler.Application.Startup;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HelixScheduler.Extensions;
+namespace HelixScheduler.WebApi.Extensions;
 
 public static class WebApplicationExtensions
 {
@@ -17,3 +17,4 @@ public static class WebApplicationExtensions
         await initializer.EnsureDemoSeedAsync(CancellationToken.None);
     }
 }
+

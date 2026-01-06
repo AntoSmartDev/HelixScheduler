@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\HelixScheduler.Application\HelixScheduler.Application.csproj" />
     <ProjectReference Include="..\HelixScheduler.Core\HelixScheduler.Core.csproj" />
     <ProjectReference Include="..\HelixScheduler.Infrastructure\HelixScheduler.Infrastructure.csproj" />
-    <ProjectReference Include="..\src\HelixScheduler.Application\HelixScheduler.Application.csproj" />
   </ItemGroup>
 
 </Project>

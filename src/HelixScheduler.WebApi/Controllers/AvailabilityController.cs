@@ -1,8 +1,8 @@
-using HelixScheduler.Application.Availability;
-using HelixScheduler.Availability;
+﻿using HelixScheduler.Application.Availability;
+using HelixScheduler.WebApi.Availability;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HelixScheduler.Controllers;
+namespace HelixScheduler.WebApi.Controllers;
 
 [ApiController]
 [Route("api/availability")]
@@ -77,3 +77,4 @@ public sealed class AvailabilityController : ControllerBase
         }
     }
 }
+

@@ -1,7 +1,7 @@
-using HelixScheduler.Application.ResourceCatalog;
+﻿using HelixScheduler.Application.ResourceCatalog;
 using Microsoft.AspNetCore.Mvc;
 
-namespace HelixScheduler.Controllers;
+namespace HelixScheduler.WebApi.Controllers;
 
 [ApiController]
 [Route("api/resources")]
@@ -37,3 +37,4 @@ public sealed class ResourcesController : ControllerBase
         string Name,
         bool IsSchedulable);
 }
+
