@@ -97,8 +97,11 @@ public sealed class AvailabilityQueryValidator
             resourceIds,
             input.PropertyIds,
             normalizedGroups,
-            input.IncludeDescendants,
-            input.Explain);
+            input.IncludePropertyDescendants,
+            input.Explain,
+            input.IncludeResourceAncestors,
+            input.AncestorRelationTypes,
+            input.AncestorMode);
         return true;
     }
 

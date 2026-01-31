@@ -54,4 +54,30 @@ public sealed class PropertyRepository : IPropertyRepository
             .ToListAsync(ct)
             .ConfigureAwait(false);
     }
+
+    public async Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
+        IReadOnlyCollection<int> propertyIds,
+        CancellationToken ct)
+    {
+        if (propertyIds.Count == 0)
+        {
+            return Array.Empty<int>();
+        }
+
+        var distinctIds = propertyIds.Distinct().ToList();
+        var requiredCount = distinctIds.Count;
+        if (requiredCount == 1)
+        {
+            return await GetResourceIdsByPropertiesAsync(distinctIds, ct).ConfigureAwait(false);
+        }
+
+        return await _dbContext.ResourcePropertyLinks
+            .AsNoTracking()
+            .Where(link => distinctIds.Contains(link.PropertyId))
+            .GroupBy(link => link.ResourceId)
+            .Where(group => group.Select(link => link.PropertyId).Distinct().Count() == requiredCount)
+            .Select(group => group.Key)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
 }

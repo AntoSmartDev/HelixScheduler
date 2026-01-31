@@ -8,4 +8,13 @@ public interface IPropertySchemaService
         IReadOnlyList<int> resourceIds,
         IReadOnlyList<int> propertyIds,
         CancellationToken ct);
+
+    Task ValidatePropertyFiltersForTypeAsync(
+        int resourceTypeId,
+        IReadOnlyList<int> propertyIds,
+        CancellationToken ct);
+
+    Task<IReadOnlyList<ResourceTypeAssignment>> GetResourceTypeAssignmentsAsync(
+        IReadOnlyList<int> resourceIds,
+        CancellationToken ct);
 }

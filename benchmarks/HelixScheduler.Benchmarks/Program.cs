@@ -1,3 +1,10 @@
 using BenchmarkDotNet.Running;
 
-BenchmarkRunner.Run<AvailabilityBenchmarks>();
+BenchmarkSwitcher
+    .FromTypes(new[]
+    {
+        typeof(AvailabilityBenchmarks),
+        typeof(ApplicationBenchmarks),
+        typeof(EndToEndBenchmarks)
+    })
+    .Run(args);

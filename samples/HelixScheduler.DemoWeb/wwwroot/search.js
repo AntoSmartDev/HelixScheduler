@@ -13,16 +13,18 @@ const state = {
   rules: [],
   busyEvents: [],
   selectedRuleId: null,
+  ancestorFilters: []
 };
 
 const requirementsEl = document.getElementById("requirements");
 const weekLabelEl = document.getElementById("weekLabel");
-const calendarEl = document.getElementById("calendar");
-const busyCalendarEl = document.getElementById("busyCalendar");
-const rulesEl = document.getElementById("rules");
-const busyEl = document.getElementById("busy");
-const explainEl = document.getElementById("explain");
-const summaryEl = document.getElementById("searchSummary");
+  const calendarEl = document.getElementById("calendar");
+  const busyCalendarEl = document.getElementById("busyCalendar");
+  const rulesEl = document.getElementById("rules");
+  const busyEl = document.getElementById("busy");
+  const explainEl = document.getElementById("explain");
+  const summaryEl = document.getElementById("searchSummary");
+  const searchEmptyStateEl = document.getElementById("searchEmptyState");
 const ruleImpactEl = document.getElementById("ruleImpactInfo");
 const computeStatusEl = document.getElementById("computeStatus");
 const busyNoteEl = document.getElementById("busyNote");
@@ -30,14 +32,86 @@ const errorEl = document.getElementById("searchError");
 const apiStatusEl = document.getElementById("apiStatus");
 const apiStatusMessageEl = document.getElementById("apiStatusMessage");
 const apiRetryEl = document.getElementById("apiRetry");
+  const payloadPreviewEl = document.getElementById("payloadPreview");
+  const copyPayloadBtn = document.getElementById("copyPayload");
+const ancestorFilterTypeEl = document.getElementById("ancestorFilterType");
+const ancestorFilterDefinitionEl = document.getElementById("ancestorFilterDefinition");
+const ancestorFilterPropertyEl = document.getElementById("ancestorFilterProperty");
+const ancestorFilterIncludeDescendantsEl = document.getElementById("ancestorFilterIncludeDescendants");
+const ancestorFilterMatchModeEl = document.getElementById("ancestorFilterMatchMode");
+const ancestorFilterScopeEl = document.getElementById("ancestorFilterScope");
+const ancestorFilterMatchAllEl = document.getElementById("ancestorFilterMatchAll");
+const ancestorFilterChipsEl = document.getElementById("ancestorFilterChips");
+const ancestorTypesWrapEl = document.getElementById("ancestorTypesWrap");
+const ancestorFiltersWrapEl = document.getElementById("ancestorFiltersWrap");
+const ancestorTypesAllEl = document.getElementById("ancestorTypesAll");
+const ancestorTypesSpecificEl = document.getElementById("ancestorTypesSpecific");
+const slotDurationWrapEl = document.getElementById("slotDurationWrap");
+const includeRemainderWrapEl = document.getElementById("includeRemainderWrap");
 let apiCheckInFlight = false;
 
-document.getElementById("prevWeek").addEventListener("click", () => shiftWeek(-7));
-document.getElementById("nextWeek").addEventListener("click", () => shiftWeek(7));
-document.getElementById("addRequirement").addEventListener("click", () => addRequirement());
-document.getElementById("computeSearch").addEventListener("click", () => computeSearch());
-document.getElementById("resetSearch").addEventListener("click", () => resetBuilder());
-apiRetryEl.addEventListener("click", () => retryApiReady());
+  document.getElementById("prevWeek").addEventListener("click", () => shiftWeek(-7));
+  document.getElementById("nextWeek").addEventListener("click", () => shiftWeek(7));
+  document.getElementById("addRequirement").addEventListener("click", () => addRequirement());
+  document.getElementById("computeSearch").addEventListener("click", () => computeSearch());
+  document.getElementById("resetSearch").addEventListener("click", () => resetBuilder());
+  apiRetryEl.addEventListener("click", () => retryApiReady());
+  const showIdsToggle = document.getElementById("toggleShowIds");
+  if (showIdsToggle) {
+    showIdsToggle.addEventListener("change", () => {
+      refreshSearchUiFromState();
+    });
+  }
+  document.body.addEventListener("click", event => {
+    const link = event.target.closest(".empty-actions a");
+    if (!link || !link.getAttribute("href")?.startsWith("#")) {
+      return;
+    }
+    event.preventDefault();
+    const target = document.querySelector(link.getAttribute("href"));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+const addAncestorFilterBtn = document.getElementById("addAncestorFilter");
+const clearAncestorFiltersBtn = document.getElementById("clearAncestorFilters");
+if (addAncestorFilterBtn) {
+  addAncestorFilterBtn.addEventListener("click", () => addAncestorFilter());
+}
+if (clearAncestorFiltersBtn) {
+  clearAncestorFiltersBtn.addEventListener("click", () => clearAncestorFilters());
+}
+if (ancestorFilterTypeEl) {
+  ancestorFilterTypeEl.addEventListener("change", () => {
+    renderAncestorFilterDefinitions();
+    renderAncestorFilterProperties();
+  });
+}
+if (ancestorFilterDefinitionEl) {
+  ancestorFilterDefinitionEl.addEventListener("change", () => {
+    renderAncestorFilterProperties();
+  });
+}
+if (copyPayloadBtn) {
+  copyPayloadBtn.addEventListener("click", () => copyPayload());
+}
+document.getElementById("toggleAncestors").addEventListener("change", () => {
+  updateAncestorTypesVisibility();
+  renderPayloadPreview();
+});
+document.getElementById("toggleSlotDuration").addEventListener("change", () => {
+  updateSlotDurationVisibility();
+  renderPayloadPreview();
+});
+document.querySelectorAll("input[name=\"ancestorRelationType\"]").forEach(input => {
+  input.addEventListener("change", () => renderPayloadPreview());
+});
+if (ancestorTypesAllEl) {
+  ancestorTypesAllEl.addEventListener("change", () => {
+    updateAncestorTypesState();
+    renderPayloadPreview();
+  });
+}
 
 function createElement(tag, className, text) {
   const el = document.createElement(tag);
@@ -49,6 +123,19 @@ function createElement(tag, className, text) {
   }
   return el;
 }
+
+function refreshSearchUiFromState() {
+  renderRequirements();
+  const payloadInfo = buildSearchPayload();
+  if (payloadInfo.payload) {
+    renderSearchSummary(payloadInfo.requirements, payloadInfo.payload);
+  }
+  renderRules(state.rules || []);
+  renderBusy(state.busyEvents || []);
+  renderBusyCalendar(state.busyEvents || []);
+}
+
+
 
 function isoDate(date) {
   return date.toISOString().slice(0, 10);
@@ -100,7 +187,7 @@ async function retryApiReady() {
 async function loadCatalogs() {
   const [typesRes, resourcesRes, propertiesRes] = await Promise.all([
     fetch(`${state.apiBaseUrl}/api/catalog/resource-types`),
-    fetch(`${state.apiBaseUrl}/api/catalog/resources?onlySchedulable=true`),
+    fetch(`${state.apiBaseUrl}/api/catalog/resources?onlySchedulable=false`),
     fetch(`${state.apiBaseUrl}/api/catalog/properties`)
   ]);
 
@@ -114,6 +201,11 @@ async function loadCatalogs() {
   state.propertyMap = new Map(state.propertyNodes.map(node => [node.id, node]));
   state.propertyChildren = buildPropertyChildrenMap(state.propertyNodes);
   state.typePropertyMap = buildTypePropertyMap(propertySchema.typeMappings || []);
+
+  renderAncestorFilterTypes();
+  renderAncestorFilterDefinitions();
+  renderAncestorFilterProperties();
+  renderAncestorFilterChips();
 }
 
 function buildPropertyChildrenMap(properties) {
@@ -126,6 +218,48 @@ function buildPropertyChildrenMap(properties) {
     map.get(property.parentId).push(property.id);
   });
   return map;
+}
+
+function appendPropertyTreeOptions(container, definitionId, selectedNodeId) {
+  const rootNode = getDefinitionRootNode(definitionId);
+  if (!rootNode) {
+    return;
+  }
+
+  const anyOption = document.createElement("option");
+  anyOption.value = rootNode.id;
+  anyOption.textContent = `Any ${DemoFormat.formatIdLabel(rootNode.label, rootNode.id)}`;
+  if (selectedNodeId === rootNode.id) {
+    anyOption.selected = true;
+  }
+  container.appendChild(anyOption);
+
+  appendPropertyChildren(container, definitionId, rootNode.id, 1, selectedNodeId);
+}
+
+function appendPropertyChildren(container, definitionId, parentId, depth, selectedNodeId) {
+  const children = (state.propertyChildren.get(parentId) || [])
+    .map(id => state.propertyMap.get(id))
+    .filter(node => node && node.definitionId === definitionId)
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const prefix = `${"-".repeat(Math.max(1, depth) * 2)}>`;
+  children.forEach(child => {
+    const option = document.createElement("option");
+    option.value = child.id;
+    option.textContent = `${prefix}${DemoFormat.formatIdLabel(child.label, child.id)}`;
+    if (selectedNodeId === child.id) {
+      option.selected = true;
+    }
+    container.appendChild(option);
+    appendPropertyChildren(container, definitionId, child.id, depth + 1, selectedNodeId);
+  });
+}
+
+function getDefinitionRootNode(definitionId) {
+  return state.propertyNodes.find(
+    node => node.definitionId === definitionId && node.parentId == null
+  );
 }
 
 function buildTypePropertyMap(typeMappings) {
@@ -155,21 +289,42 @@ function addRequirement() {
 
 function resetBuilder() {
   state.requirements = [];
+  state.ancestorFilters = [];
   addRequirement();
   renderRequirements();
-  summaryEl.textContent = "Waiting for query.";
-  calendarEl.innerHTML = "";
+  renderPayloadPreview();
+  const summaryBody = summaryEl.querySelector(".query-summary-body") ?? summaryEl;
+  summaryBody.textContent = "Waiting for query.";
+  renderCalendarPlaceholder("Waiting for query. Build a request and click Compute availability.");
   busyCalendarEl.innerHTML = "";
   rulesEl.textContent = "No compute yet.";
   busyEl.textContent = "No compute yet.";
   explainEl.textContent = "Explain disabled.";
   busyNoteEl.textContent = "Busy intervals that remove or split availability.";
   errorEl.textContent = "";
+  if (ancestorFilterChipsEl) {
+    ancestorFilterChipsEl.textContent = "No ancestor filters.";
+  }
+  const slotDurationEl = document.getElementById("slotDurationMinutes");
+  if (slotDurationEl) {
+    slotDurationEl.value = "";
+  }
+  const slotDurationToggle = document.getElementById("toggleSlotDuration");
+  if (slotDurationToggle) {
+    slotDurationToggle.checked = false;
+  }
+  const includeRemainderEl = document.getElementById("includeRemainderSlot");
+  if (includeRemainderEl) {
+    includeRemainderEl.checked = false;
+  }
+  updateAncestorTypesVisibility();
+  updateSlotDurationVisibility();
 }
 
 function renderRequirements() {
   if (state.requirements.length === 0) {
     requirementsEl.textContent = "Add a resource type.";
+    renderPayloadPreview(null, "Add a resource type to see payload.");
     return;
   }
 
@@ -194,8 +349,16 @@ function renderRequirements() {
     const grid = document.createElement("div");
     grid.className = "requirement-grid";
 
-    grid.appendChild(buildSelectRow("Resource type", buildTypeSelect(req)));
-    grid.appendChild(buildSelectRow("Specific resource", buildResourceSelect(req)));
+    grid.appendChild(buildSelectRow(
+      "Resource type",
+      buildTypeSelect(req),
+      "Search includes non-schedulable resource types (e.g., Site/Floor) for ancestor filtering."
+    ));
+    grid.appendChild(buildSelectRow(
+      "Specific resource",
+      buildResourceSelect(req),
+      "Search includes non-schedulable resources (e.g., Site/Floor) for ancestor filtering."
+    ));
 
     const typeLabel = req.typeId
       ? state.resourceTypes.find(t => t.id === req.typeId)?.label || "Type"
@@ -212,13 +375,21 @@ function renderRequirements() {
     card.appendChild(buildCandidatePreview(req));
     requirementsEl.appendChild(card);
   });
+
+  renderPayloadPreview(buildSearchPayload().payload);
 }
 
-function buildSelectRow(labelText, element) {
+function buildSelectRow(labelText, element, tooltip) {
   const wrapper = document.createElement("div");
   wrapper.className = "input-row";
   const label = document.createElement("label");
   label.textContent = labelText;
+  if (tooltip) {
+    label.appendChild(document.createTextNode(" "));
+    const info = createElement("span", "info-icon", "i");
+    info.setAttribute("data-tooltip", tooltip);
+    label.appendChild(info);
+  }
   wrapper.appendChild(label);
   wrapper.appendChild(element);
   return wrapper;
@@ -232,7 +403,7 @@ function buildTypeSelect(req) {
   sorted.forEach(type => {
     const option = document.createElement("option");
     option.value = type.id;
-    option.textContent = `${type.label} (#${type.id})`;
+    option.textContent = DemoFormat.formatTypeLabel(type);
     if (req.typeId === type.id) {
       option.selected = true;
     }
@@ -263,7 +434,7 @@ function buildResourceSelect(req) {
     resources.forEach(resource => {
       const option = document.createElement("option");
       option.value = resource.id;
-      option.textContent = `${resource.name} (#${resource.id})`;
+      option.textContent = DemoFormat.formatIdLabel(resource.name, resource.id);
       if (req.resourceId === resource.id) {
         option.selected = true;
       }
@@ -293,7 +464,7 @@ function buildDefinitionSelect(req) {
     defs.forEach(def => {
       const option = document.createElement("option");
       option.value = def.id;
-      option.textContent = `${def.label} (#${def.id})`;
+      option.textContent = DemoFormat.formatDefinitionLabel(def);
       if (req.definitionId === def.id) {
         option.selected = true;
       }
@@ -318,18 +489,7 @@ function buildPropertyFilterRow(req) {
   nodeSelect.innerHTML = "<option value=\"\">Select property</option>";
 
   if (req.definitionId) {
-    const nodes = state.propertyNodes
-      .filter(node => node.definitionId === req.definitionId && node.parentId !== null)
-      .sort((a, b) => a.label.localeCompare(b.label));
-    nodes.forEach(node => {
-      const option = document.createElement("option");
-      option.value = node.id;
-      option.textContent = `${node.label} (#${node.id})`;
-      if (req.nodeId === node.id) {
-        option.selected = true;
-      }
-      nodeSelect.appendChild(option);
-    });
+    appendPropertyTreeOptions(nodeSelect, req.definitionId, req.nodeId);
   }
 
   nodeSelect.addEventListener("change", () => {
@@ -357,7 +517,7 @@ function buildPropertyFilterRow(req) {
   });
   includeLabel.appendChild(includeToggle);
   const includeText = document.createElement("span");
-  includeText.textContent = "Include descendants";
+  includeText.textContent = "Include property descendants";
   const info = createElement("span", "info-icon", "i");
   info.setAttribute("data-tooltip", "When enabled, child properties in the hierarchy are included in the filter.");
   includeText.appendChild(document.createTextNode(" "));
@@ -423,7 +583,7 @@ function buildCandidatePreview(req) {
   }
 
   const matches = getMatchingResources(req);
-  const names = matches.slice(0, 10).map(resource => resource.name);
+  const names = matches.slice(0, 10).map(resource => DemoFormat.formatIdLabel(resource.name, resource.id));
   preview.appendChild(createElement("strong", null, `Matching resources: ${matches.length}`));
   const suffix = matches.length > names.length ? ` +${matches.length - names.length} more` : "";
   preview.appendChild(createElement("span", "slot-meta", `${names.length ? names.join(", ") : "No matches"}${suffix}`));
@@ -476,54 +636,27 @@ function formatFilterLabel(filter) {
   }
   const definition = state.propertyDefinitions.get(node.definitionId);
   const prefix = definition ? `${definition.label}: ` : "";
-  const suffix = filter.includeDescendants ? " (include descendants)" : "";
+  const suffix = filter.includeDescendants ? " (include property descendants)" : "";
   return `${prefix}${node.label}${suffix}`;
 }
 
 async function computeSearch() {
   errorEl.textContent = "";
   setComputeStatus("Computing...");
-  const requirements = state.requirements.filter(req => req.typeId);
-  if (requirements.length === 0) {
-    errorEl.textContent = "Add at least one resource type.";
+  const payloadInfo = buildSearchPayload();
+  renderPayloadPreview(payloadInfo.payload, payloadInfo.message);
+  const requirements = payloadInfo.requirements;
+  const payload = payloadInfo.payload;
+  if (!payload) {
+    errorEl.textContent = payloadInfo.message || "Unable to build request payload.";
     setComputeStatus("Waiting");
+    renderCalendarPlaceholder("Waiting for query. Build a request and click Compute availability.");
     return;
   }
 
-  const requiredResourceIds = [];
-  const resourceOrGroups = [];
   const previewResources = new Set();
-
-  for (const req of requirements) {
-    const candidates = getMatchingResources(req);
-    if (req.resourceId) {
-      if (candidates.length === 0) {
-        errorEl.textContent = "Selected resource does not match the chosen type.";
-        return;
-      }
-      requiredResourceIds.push(req.resourceId);
-      previewResources.add(req.resourceId);
-      continue;
-    }
-
-    if (candidates.length === 0) {
-      errorEl.textContent = "Some requirements have no matching resources.";
-      setComputeStatus("Waiting");
-      return;
-    }
-
-    const groupIds = candidates.map(resource => resource.id);
-    resourceOrGroups.push(groupIds);
-    groupIds.forEach(id => previewResources.add(id));
-  }
-
-  const payload = {
-    fromDate: isoDate(state.weekStart),
-    toDate: isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)),
-    requiredResourceIds,
-    resourceOrGroups,
-    explain: document.getElementById("toggleExplain").checked
-  };
+  payload.requiredResourceIds.forEach(id => previewResources.add(id));
+  payload.resourceOrGroups.forEach(group => group.forEach(id => previewResources.add(id)));
 
   const res = await fetch(`${state.apiBaseUrl}/api/availability/compute`, {
     method: "POST",
@@ -538,10 +671,11 @@ async function computeSearch() {
     return;
   }
 
-  const data = await res.json();
-  renderCalendar(data.slots || []);
-  renderExplain(data.explanations || []);
-  renderSearchSummary(requirements, payload);
+    const data = await res.json();
+    renderCalendar(data.slots || []);
+    renderExplain(data.explanations || []);
+    renderSearchSummary(requirements, payload);
+    renderSearchEmptyState(data.slots || [], data.explanations || [], requirements, payload);
 
   await loadBusySummary(Array.from(previewResources));
   setComputeStatus("Computed");
@@ -588,14 +722,26 @@ async function loadBusySummary(resourceIds) {
   renderBusyCalendar(state.busyEvents);
 }
 
-function renderSearchSummary(requirements, payload) {
-  const intent = buildSearchIntent(requirements);
-  summaryEl.innerHTML = "";
-  summaryEl.appendChild(createElement("strong", null, "Current availability query"));
-  summaryEl.appendChild(buildSummaryRow("Intent", intent));
-  summaryEl.appendChild(buildSummaryRow("Range", `Week ${payload.fromDate} -> ${payload.toDate}`));
-  summaryEl.appendChild(buildSummaryRow("Explain", payload.explain ? "On" : "Off"));
-}
+  function renderSearchSummary(requirements, payload) {
+    const intent = buildSearchIntent(requirements);
+    const bodyEl = summaryEl.querySelector(".query-summary-body") ?? summaryEl;
+    bodyEl.innerHTML = "";
+    bodyEl.appendChild(buildSummaryRow("Intent", intent));
+    bodyEl.appendChild(buildSummaryRow("Range", `Week ${payload.fromDate} -> ${payload.toDate}`));
+    bodyEl.appendChild(buildSummaryRow("Health", formatSearchHealthSummary(requirements, payload)));
+    bodyEl.appendChild(buildSummaryRow("Explain", payload.explain ? "On" : "Off"));
+    bodyEl.appendChild(buildSummaryRow("Ancestors", payload.includeResourceAncestors ? "On" : "Off"));
+    bodyEl.appendChild(buildSummaryRow("Relation types", formatRelationTypesSummary(payload)));
+    bodyEl.appendChild(buildSummaryRow("Ancestor filters", formatAncestorFiltersSummary(payload)));
+    bodyEl.appendChild(buildSummaryRow("Slot duration", formatSlotDurationSummary(payload)));
+  }
+
+  function formatSearchHealthSummary(requirements, payload) {
+    const requirementCount = requirements.length;
+    const propertyFilterCount = requirements.reduce((total, req) => total + (req.filters?.length || 0), 0);
+    const label = requirementCount === 0 ? "Incomplete" : "Ready";
+    return `${label} · Requirements ${requirementCount} · Property filters ${propertyFilterCount}`;
+  }
 
 function setComputeStatus(message) {
   if (!computeStatusEl) return;
@@ -608,11 +754,11 @@ function buildSearchIntent(requirements) {
   }
 
   const clauses = requirements.map(req => {
-    const typeLabel = state.resourceTypes.find(t => t.id === req.typeId)?.label || `#${req.typeId}`;
+    const typeLabel = DemoFormat.formatTypeLabel(state.resourceTypes.find(t => t.id === req.typeId));
     const filters = req.filters.map(formatFilterLabel).join(" AND ");
     if (req.resourceId) {
       const resource = state.resourceMap.get(req.resourceId);
-      const resourceLabel = resource ? resource.name : `#${req.resourceId}`;
+      const resourceLabel = resource ? DemoFormat.formatIdLabel(resource.name, resource.id) : `#${req.resourceId}`;
       return `${typeLabel} = ${resourceLabel}${filters ? ` AND ${filters}` : ""}`;
     }
     return `${typeLabel} = any${filters ? ` AND ${filters}` : ""}`;
@@ -621,10 +767,54 @@ function buildSearchIntent(requirements) {
   return `Looking for availability where ${clauses.join(" AND ")}.`;
 }
 
+function formatRelationTypesSummary(payload) {
+  if (!payload.includeResourceAncestors) {
+    return "n/a";
+  }
+  const types = payload.ancestorRelationTypes || [];
+  return types.length > 0 ? types.join(", ") : "All";
+}
+
+function formatAncestorFiltersSummary(payload) {
+  const filters = payload.ancestorFilters || [];
+  if (filters.length === 0) {
+    return "None";
+  }
+  const formatted = filters.map(filter => {
+      const typeLabel = DemoFormat.formatTypeLabel(state.resourceTypes.find(t => t.id === filter.resourceTypeId));
+      const propertyLabels = (filter.propertyIds || [])
+        .map(id => DemoFormat.formatPropertyLabelSimple(id, state.propertyMap))
+        .join(", ");
+      return `${typeLabel}: ${propertyLabels}`;
+    });
+  if (formatted.length <= 2) {
+    return formatted.join(" | ");
+  }
+  return `${formatted.slice(0, 2).join(" | ")} +${formatted.length - 2} more`;
+}
+
+function formatSlotDurationSummary(payload) {
+  if (!payload.slotDurationMinutes) {
+    return "Off";
+  }
+  const remainder = payload.includeRemainderSlot ? "on" : "off";
+  return `${payload.slotDurationMinutes} min (remainder ${remainder})`;
+}
+
 function renderCalendar(slots) {
-  calendarEl.innerHTML = "";
-  const days = Array.from({ length: 7 }, (_, idx) => {
-    const date = new Date(state.weekStart);
+  if (!calendarEl) {
+    return;
+  }
+  if (!slots || slots.length === 0) {
+    calendarEl.innerHTML = "";
+    calendarEl.classList.add("empty");
+    calendarEl.innerHTML = "<div class=\"empty-message\">No availability slots for the selected range.</div>";
+    return;
+  }
+  calendarEl.classList.remove("empty");
+    calendarEl.innerHTML = "";
+    const days = Array.from({ length: 7 }, (_, idx) => {
+      const date = new Date(state.weekStart);
     date.setUTCDate(date.getUTCDate() + idx);
     return { date, slots: [] };
   });
@@ -672,6 +862,35 @@ function renderCalendar(slots) {
   });
 }
 
+function createTooltipIcon(kind) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.classList.add("tooltip-icon", kind);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  if (kind === "match") {
+    path.setAttribute("d", "M5 10l3 3 7-7");
+  } else if (kind === "none") {
+    path.setAttribute("d", "M6 10h8");
+  } else {
+    path.setAttribute("d", "M6 6l8 8M14 6l-8 8");
+  }
+  svg.appendChild(path);
+  return svg;
+}
+
+function appendTooltipLine(container, kind, text) {
+  const line = document.createElement("div");
+  line.className = "tooltip-item";
+  line.appendChild(createTooltipIcon(kind));
+  line.appendChild(document.createTextNode(text));
+  container.appendChild(line);
+}
+
 function showSlotTooltip(element, slot) {
   if (!document.getElementById("toggleExplain").checked) return;
   hideSlotTooltip(element);
@@ -681,24 +900,29 @@ function showSlotTooltip(element, slot) {
     overlapsUtc(slot.startUtc, slot.endUtc, busy.startUtc, busy.endUtc));
 
   const tooltip = createElement("div", "tooltip");
-  tooltip.appendChild(createElement("strong", null, "Slot analysis"));
-  tooltip.appendChild(createElement("div", null, "Rules (match):"));
+  tooltip.appendChild(createElement("div", "tooltip-title", "Slot analysis"));
+  tooltip.appendChild(createElement("div", "tooltip-section", "Rules matched"));
   if (rules.length === 0) {
-    tooltip.appendChild(createElement("div", null, "- [NONE] No matching rules"));
+    appendTooltipLine(tooltip, "none", "No matching rules");
   } else {
     rules.forEach(rule => {
-      tooltip.appendChild(createElement("div", null, `- [MATCH] Rule #${rule.id} - ${rule.title || "Untitled"}`));
+      appendTooltipLine(
+        tooltip,
+        "match",
+        `${DemoFormat.formatRuleLabel(rule)} - ${rule.title || "Untitled"}`
+      );
     });
   }
-  tooltip.appendChild(createElement("div", null, "Busy overlaps (block):"));
+  tooltip.appendChild(createElement("div", "tooltip-section", "Busy overlaps"));
   if (busyConflicts.length === 0) {
-    tooltip.appendChild(createElement("div", null, "- [NONE] No busy overlaps"));
+    appendTooltipLine(tooltip, "none", "No busy overlaps");
   } else {
     busyConflicts.forEach(busy => {
-      tooltip.appendChild(createElement(
-        "div",
-        null,
-        `- [BLOCK] Busy #${busy.id} - ${formatUtcTime(busy.startUtc)}-${formatUtcTime(busy.endUtc)}`));
+      appendTooltipLine(
+        tooltip,
+        "block",
+        `${DemoFormat.formatBusyLabel(busy)} - ${formatUtcTime(busy.startUtc)}-${formatUtcTime(busy.endUtc)}`
+      );
     });
   }
 
@@ -763,7 +987,7 @@ function updateRuleImpact(rule) {
     return;
   }
   const count = countSlotsForRule(resolved);
-  ruleImpactEl.textContent = `Rule #${resolved.id} contributes to ${count} slot${count === 1 ? "" : "s"} in the selected range.`;
+  ruleImpactEl.textContent = `${DemoFormat.formatRuleLabel(resolved)} contributes to ${count} slot${count === 1 ? "" : "s"} in the selected range.`;
 }
 
 function highlightRuleCards() {
@@ -853,19 +1077,21 @@ function renderRules(rules) {
   }
 
   rulesEl.innerHTML = "";
-  rules.forEach(rule => {
-    const card = document.createElement("div");
-    card.className = "card";
+    rules.forEach(rule => {
+      const card = document.createElement("div");
+      card.className = "card rule-card";
+      card.title = "Click to highlight related slots.";
     card.dataset.ruleId = rule.id;
     const dateRange = formatRuleDateRange(rule);
-    card.appendChild(createElement("strong", null, rule.title || `Rule ${rule.id}`));
-    card.appendChild(createElement("br"));
+    const titleText = rule.title || DemoFormat.formatRuleLabel(rule);
+    card.appendChild(createElement("strong", null, titleText));
+    const metaRow = createElement("div", "rule-meta");
+    metaRow.appendChild(createElement("span", "slot-meta", DemoFormat.formatRuleLabel(rule)));
+    metaRow.appendChild(createElement("span", "rule-time", `${formatTimeRange(rule.startTime, rule.endTime)} UTC`));
+    card.appendChild(metaRow);
     if (dateRange) {
-      card.appendChild(document.createTextNode(dateRange));
-      card.appendChild(createElement("br"));
+      card.appendChild(createElement("div", "rule-date", dateRange));
     }
-    card.appendChild(document.createTextNode(`${formatTimeRange(rule.startTime, rule.endTime)} UTC`));
-    card.appendChild(createElement("br"));
     appendResourceTags(card, rule.resourceIds);
     card.addEventListener("click", () => {
       state.selectedRuleId = state.selectedRuleId === rule.id ? null : rule.id;
@@ -886,35 +1112,92 @@ function renderBusy(busyEvents) {
   busyEvents.forEach(busy => {
     const card = document.createElement("div");
     card.className = "card";
-    card.appendChild(createElement("strong", null, busy.title || `Busy ${busy.id}`));
-    card.appendChild(createElement("br"));
-    card.appendChild(createElement("span", null, `${formatUtcDateTime(busy.startUtc)} - ${formatUtcDateTime(busy.endUtc)}`));
-    card.appendChild(createElement("br"));
+    const titleText = busy.title || DemoFormat.formatBusyLabel(busy);
+    card.appendChild(createElement("strong", null, titleText));
+    card.appendChild(createElement("div", "rule-time", `${formatUtcDateTime(busy.startUtc)} - ${formatUtcDateTime(busy.endUtc)}`));
     appendResourceTags(card, busy.resourceIds);
     busyEl.appendChild(card);
   });
 }
 
-function renderExplain(explanations) {
-  if (!document.getElementById("toggleExplain").checked) {
-    explainEl.textContent = "Explain disabled.";
-    return;
+  function renderExplain(explanations) {
+    if (!document.getElementById("toggleExplain").checked) {
+      explainEl.textContent = "Explain disabled.";
+      return;
   }
   if (explanations.length === 0) {
     explainEl.textContent = "No explanations.";
     return;
   }
   explainEl.innerHTML = "";
-  explanations.forEach(exp => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <strong>${exp.reason}</strong><br/>
-      ${exp.message}
-    `;
-    explainEl.appendChild(card);
-  });
-}
+    explanations.forEach(exp => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <strong>${exp.reason}</strong><br/>
+        ${exp.message}
+      `;
+      explainEl.appendChild(card);
+    });
+  }
+
+  function renderSearchEmptyState(slots, explanations, requirements, payload) {
+    if (!searchEmptyStateEl) {
+      return;
+    }
+    if (slots && slots.length > 0) {
+      searchEmptyStateEl.style.display = "none";
+      searchEmptyStateEl.textContent = "";
+      return;
+    }
+
+    const requirementCount = requirements.length;
+    const propertyCount = requirements.reduce((total, req) => total + (req.filters?.length || 0), 0);
+    const reason = explanations?.[0]?.reason ?? null;
+    const lines = [];
+
+    if (requirementCount === 0) {
+      lines.push("Add at least one resource type.");
+    } else {
+      switch (reason) {
+        case "NoPositiveRule":
+          lines.push("No positive rules apply in this range.");
+          break;
+        case "FullyBlockedByBusy":
+          lines.push("Busy events block availability in this range.");
+          break;
+        case "FullyBlockedByNegativeRule":
+          lines.push("Negative rules block availability in this range.");
+          break;
+        case "PartiallyBlocked":
+          lines.push("Rules or busy events block availability in this range.");
+          break;
+        default:
+          lines.push("No availability found for the current filters.");
+          break;
+      }
+      if (propertyCount > 0) {
+        lines.push("Property filters may be too restrictive.");
+      }
+      lines.push("Try widening the date range or adjusting filters.");
+    }
+
+    searchEmptyStateEl.innerHTML = "";
+    searchEmptyStateEl.appendChild(createElement("strong", null, "No availability found"));
+    lines.forEach(text => {
+      searchEmptyStateEl.appendChild(createElement("div", null, text));
+    });
+    const quick = createElement("div", "empty-actions");
+    const rulesLink = createElement("a", "link", "See rules");
+    rulesLink.href = "#rules";
+    const busyLink = createElement("a", "link", "See busy calendar");
+    busyLink.href = "#busyCalendar";
+    quick.appendChild(rulesLink);
+    quick.appendChild(document.createTextNode(" · "));
+    quick.appendChild(busyLink);
+    searchEmptyStateEl.appendChild(quick);
+    searchEmptyStateEl.style.display = "block";
+  }
 
 function normalizeUtc(iso) {
   if (!iso) return iso;
@@ -966,13 +1249,13 @@ function appendResourceTags(container, resourceIds) {
     container.appendChild(createElement("span", "slot-meta", "No resources"));
     return;
   }
-  resourceIds.forEach(id => {
-    const resource = state.resourceMap.get(id);
-    const name = resource?.name || `#${id}`;
-    const type = getResourceType(resource);
-    const tag = createElement("span", `tag tag-${type}`, name);
-    container.appendChild(tag);
-  });
+    resourceIds.forEach(id => {
+      const resource = state.resourceMap.get(id);
+      const name = resource ? DemoFormat.formatIdLabel(resource.name, resource.id) : `#${id}`;
+      const type = getResourceType(resource);
+      const tag = createElement("span", `tag tag-${type}`, name);
+      container.appendChild(tag);
+    });
 }
 
 function getResourceType(resource) {
@@ -981,6 +1264,340 @@ function getResourceType(resource) {
   if (key.includes("doctor")) return "doctor";
   if (key.includes("room")) return "room";
   return "other";
+}
+
+function renderCalendarPlaceholder(message) {
+  if (!calendarEl) {
+    return;
+  }
+  calendarEl.classList.add("empty");
+  calendarEl.innerHTML = `<div class="empty-message">${message}</div>`;
+}
+
+function parseAncestorTypes() {
+  if (ancestorTypesAllEl?.checked) {
+    return [];
+  }
+  const inputs = document.querySelectorAll("input[name=\"ancestorRelationType\"]");
+  const selected = [];
+  inputs.forEach(input => {
+    if (input.checked) {
+      selected.push(input.value);
+    }
+  });
+  return selected;
+}
+
+function parseSlotDurationMinutes() {
+  const enabled = document.getElementById("toggleSlotDuration")?.checked;
+  if (!enabled) {
+    return null;
+  }
+  const input = document.getElementById("slotDurationMinutes");
+  if (!input) {
+    return null;
+  }
+  const value = Number.parseInt(input.value, 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function buildSearchPayload() {
+  const requirements = state.requirements.filter(req => req.typeId);
+  if (requirements.length === 0) {
+    return { payload: null, requirements, message: "Add a resource type to see payload." };
+  }
+
+  const groupsResult = buildRequirementGroups(requirements);
+  if (groupsResult.error) {
+    return { payload: null, requirements, message: groupsResult.error };
+  }
+
+  const includeAncestorsToggle = document.getElementById("toggleAncestors").checked;
+  const ancestorTypes = parseAncestorTypes();
+  const slotDurationMinutes = parseSlotDurationMinutes();
+  const includeRemainderSlot = document.getElementById("includeRemainderSlot").checked;
+  const ancestorFilters = buildAncestorFiltersPayload();
+  const includeAncestorsEffective = includeAncestorsToggle || ancestorFilters.length > 0;
+
+  const payload = {
+    fromDate: isoDate(state.weekStart),
+    toDate: isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)),
+    requiredResourceIds: groupsResult.requiredResourceIds,
+    resourceOrGroups: groupsResult.resourceOrGroups,
+    explain: document.getElementById("toggleExplain").checked,
+    includeResourceAncestors: includeAncestorsEffective,
+    ancestorRelationTypes: ancestorTypes.length > 0 ? ancestorTypes : null,
+    ancestorMode: includeAncestorsEffective ? "perGroup" : null,
+    slotDurationMinutes: slotDurationMinutes ?? null,
+    includeRemainderSlot: slotDurationMinutes ? includeRemainderSlot : false,
+    ancestorFilters: ancestorFilters.length > 0 ? ancestorFilters : null
+  };
+
+  return { payload, requirements, message: "" };
+}
+
+function buildRequirementGroups(requirements) {
+  const requiredResourceIds = [];
+  const resourceOrGroups = [];
+  for (const req of requirements) {
+    const candidates = getMatchingResources(req);
+    if (req.resourceId) {
+      if (candidates.length === 0) {
+        return { error: "Selected resource does not match the chosen type." };
+      }
+      requiredResourceIds.push(req.resourceId);
+      continue;
+    }
+
+    if (candidates.length === 0) {
+      return { error: "Some requirements have no matching resources." };
+    }
+
+    resourceOrGroups.push(candidates.map(resource => resource.id));
+  }
+
+  if (requiredResourceIds.length === 0 && resourceOrGroups.length === 0) {
+    return { error: "Add at least one resource type." };
+  }
+
+  return { requiredResourceIds, resourceOrGroups };
+}
+
+function renderPayloadPreview(payload, message) {
+  if (!payloadPreviewEl) {
+    return;
+  }
+  if (!payload) {
+    payloadPreviewEl.textContent = message || "Configure a query to see payload.";
+    return;
+  }
+  payloadPreviewEl.textContent = JSON.stringify(payload, null, 2);
+}
+
+async function copyPayload() {
+  if (!payloadPreviewEl) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(payloadPreviewEl.textContent);
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = payloadPreviewEl.textContent;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+}
+
+function renderAncestorFilterTypes() {
+  if (!ancestorFilterTypeEl) {
+    return;
+  }
+  ancestorFilterTypeEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select type";
+  ancestorFilterTypeEl.appendChild(placeholder);
+  const sorted = [...state.resourceTypes].sort((a, b) => a.label.localeCompare(b.label));
+  sorted.forEach(type => {
+    const option = document.createElement("option");
+    option.value = type.id;
+    option.textContent = DemoFormat.formatTypeLabel(type);
+    ancestorFilterTypeEl.appendChild(option);
+  });
+}
+
+function renderAncestorFilterDefinitions() {
+  if (!ancestorFilterDefinitionEl) {
+    return;
+  }
+  ancestorFilterDefinitionEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select definition";
+  ancestorFilterDefinitionEl.appendChild(placeholder);
+  const typeId = Number(ancestorFilterTypeEl.value);
+  if (!Number.isFinite(typeId) || typeId <= 0) {
+    return;
+  }
+  const allowed = state.typePropertyMap.get(typeId);
+  if (!allowed || allowed.size === 0) {
+    return;
+  }
+  const defs = Array.from(allowed)
+    .map(id => state.propertyDefinitions.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label));
+  defs.forEach(def => {
+    const option = document.createElement("option");
+    option.value = def.id;
+      option.textContent = DemoFormat.formatDefinitionLabel(def);
+    ancestorFilterDefinitionEl.appendChild(option);
+  });
+}
+
+function renderAncestorFilterProperties() {
+  if (!ancestorFilterPropertyEl) {
+    return;
+  }
+  ancestorFilterPropertyEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select property";
+  ancestorFilterPropertyEl.appendChild(placeholder);
+
+  const definitionId = Number(ancestorFilterDefinitionEl.value);
+  if (!Number.isFinite(definitionId) || definitionId <= 0) {
+    return;
+  }
+  appendPropertyTreeOptions(ancestorFilterPropertyEl, definitionId, null);
+}
+
+function addAncestorFilter() {
+  if (!ancestorFilterTypeEl || !ancestorFilterPropertyEl) {
+    return;
+  }
+  const typeId = Number(ancestorFilterTypeEl.value);
+  const propertyId = Number(ancestorFilterPropertyEl.value);
+  if (!Number.isFinite(typeId) || typeId <= 0 || !Number.isFinite(propertyId) || propertyId <= 0) {
+    return;
+  }
+
+  const filter = {
+    resourceTypeId: typeId,
+    propertyIds: [propertyId],
+    includePropertyDescendants: ancestorFilterIncludeDescendantsEl?.checked ?? false,
+    matchMode: ancestorFilterMatchModeEl?.value || "or",
+    scope: ancestorFilterScopeEl?.value || "anyAncestor",
+    matchAllAncestors: ancestorFilterMatchAllEl?.checked ?? false
+  };
+
+  const existing = state.ancestorFilters.find(item =>
+    item.resourceTypeId === filter.resourceTypeId
+    && item.includePropertyDescendants === filter.includePropertyDescendants
+    && item.matchMode === filter.matchMode
+    && item.scope === filter.scope
+    && item.matchAllAncestors === filter.matchAllAncestors);
+
+  if (existing) {
+    if (!existing.propertyIds.includes(propertyId)) {
+      existing.propertyIds.push(propertyId);
+    }
+  } else {
+    state.ancestorFilters.push(filter);
+  }
+
+  renderAncestorFilterChips();
+  updateAncestorTypesVisibility();
+  renderPayloadPreview();
+}
+
+function clearAncestorFilters() {
+  state.ancestorFilters = [];
+  renderAncestorFilterChips();
+  updateAncestorTypesVisibility();
+  renderPayloadPreview();
+}
+
+function renderAncestorFilterChips() {
+  if (!ancestorFilterChipsEl) {
+    return;
+  }
+  if (state.ancestorFilters.length === 0) {
+    ancestorFilterChipsEl.textContent = "No ancestor filters.";
+    return;
+  }
+
+  ancestorFilterChipsEl.innerHTML = "";
+  state.ancestorFilters.forEach((filter, index) => {
+    const typeLabel = state.resourceTypes.find(t => t.id === filter.resourceTypeId)?.label || `Type ${filter.resourceTypeId}`;
+    const propertyLabels = filter.propertyIds
+      .map(id => DemoFormat.formatPropertyLabelSimple(id, state.propertyMap))
+      .join(", ");
+    const chip = createElement(
+      "span",
+      "chip",
+      `${typeLabel}: ${propertyLabels} | ${filter.matchMode} | ${filter.scope}${filter.matchAllAncestors ? " | all ancestors" : ""}`);
+    const remove = createElement("button", "btn ghost small", "x");
+    remove.addEventListener("click", () => {
+      state.ancestorFilters.splice(index, 1);
+      renderAncestorFilterChips();
+      updateAncestorTypesVisibility();
+      renderPayloadPreview();
+    });
+    chip.appendChild(remove);
+    ancestorFilterChipsEl.appendChild(chip);
+  });
+}
+
+function buildAncestorFiltersPayload() {
+  return state.ancestorFilters.map(filter => ({
+    resourceTypeId: filter.resourceTypeId,
+    propertyIds: filter.propertyIds,
+    includePropertyDescendants: filter.includePropertyDescendants,
+    matchMode: filter.matchMode,
+    scope: filter.scope,
+    matchAllAncestors: filter.matchAllAncestors
+  }));
+}
+
+function updateAncestorTypesVisibility() {
+  const includeAncestors = document.getElementById("toggleAncestors").checked;
+  if (ancestorTypesWrapEl) {
+    ancestorTypesWrapEl.style.display = includeAncestors || state.ancestorFilters.length > 0 ? "block" : "none";
+  }
+  if (!ancestorFiltersWrapEl) {
+    return;
+  }
+  ancestorFiltersWrapEl.style.display = includeAncestors || state.ancestorFilters.length > 0 ? "block" : "none";
+  updateAncestorTypesState();
+}
+
+function updateAncestorTypesState() {
+  if (!ancestorTypesAllEl) {
+    return;
+  }
+  const inputs = document.querySelectorAll("input[name=\"ancestorRelationType\"]");
+  if (ancestorTypesAllEl.checked) {
+    if (ancestorTypesSpecificEl) {
+      ancestorTypesSpecificEl.style.display = "none";
+    }
+    inputs.forEach(input => {
+      input.checked = true;
+      input.disabled = true;
+    });
+  } else {
+    if (ancestorTypesSpecificEl) {
+      ancestorTypesSpecificEl.style.display = "flex";
+    }
+    inputs.forEach(input => {
+      input.disabled = false;
+    });
+  }
+}
+
+function updateSlotDurationVisibility() {
+  if (!slotDurationWrapEl) {
+    return;
+  }
+  const enabled = document.getElementById("toggleSlotDuration")?.checked;
+  slotDurationWrapEl.style.display = enabled ? "block" : "none";
+  if (!enabled) {
+    const input = document.getElementById("slotDurationMinutes");
+    if (input) {
+      input.value = "";
+    }
+    const includeRemainderEl = document.getElementById("includeRemainderSlot");
+    if (includeRemainderEl) {
+      includeRemainderEl.checked = false;
+    }
+    if (includeRemainderWrapEl) {
+      includeRemainderWrapEl.style.display = "none";
+    }
+  } else if (includeRemainderWrapEl) {
+    includeRemainderWrapEl.style.display = "flex";
+  }
 }
 
 function buildSummaryRow(labelText, valueText) {
@@ -1002,6 +1619,9 @@ init();
 async function bootstrapAfterApiReady() {
   await loadCatalogs();
   resetBuilder();
+  updateAncestorTypesVisibility();
+  updateAncestorTypesState();
+  updateSlotDurationVisibility();
   setApiStatus("hidden", "");
 }
 
@@ -1043,3 +1663,6 @@ function setApiStatus(stateName, message) {
   apiStatusEl.classList.add(stateName);
   apiStatusMessageEl.textContent = message;
 }
+
+
+

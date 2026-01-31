@@ -127,6 +127,67 @@ public sealed class PropertySchemaService : IPropertySchemaService
         }
     }
 
+    public async Task ValidatePropertyFiltersForTypeAsync(
+        int resourceTypeId,
+        IReadOnlyList<int> propertyIds,
+        CancellationToken ct)
+    {
+        if (propertyIds.Count == 0)
+        {
+            return;
+        }
+
+        var nodes = await _dataSource.GetPropertyNodesAsync(ct).ConfigureAwait(false);
+        var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
+        var definitionIds = new HashSet<int>();
+
+        for (var i = 0; i < propertyIds.Count; i++)
+        {
+            var propertyId = propertyIds[i];
+            if (!nodeMap.ContainsKey(propertyId))
+            {
+                throw new AvailabilityRequestException($"propertyIds contains unknown id {propertyId}.");
+            }
+
+            definitionIds.Add(ResolveDefinitionId(propertyId, nodeMap));
+        }
+
+        var typeLinks = await _dataSource.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
+        var typeDefinitionMap = new Dictionary<int, HashSet<int>>();
+        for (var i = 0; i < typeLinks.Count; i++)
+        {
+            var link = typeLinks[i];
+            if (!typeDefinitionMap.TryGetValue(link.ResourceTypeId, out var defs))
+            {
+                defs = new HashSet<int>();
+                typeDefinitionMap[link.ResourceTypeId] = defs;
+            }
+            defs.Add(link.PropertyDefinitionId);
+        }
+
+        if (!typeDefinitionMap.TryGetValue(resourceTypeId, out var allowed))
+        {
+            throw new AvailabilityRequestException(
+                $"Resource type {resourceTypeId} does not allow requested properties.");
+        }
+
+        foreach (var definitionId in definitionIds)
+        {
+            if (!allowed.Contains(definitionId))
+            {
+                throw new AvailabilityRequestException(
+                    $"propertyIds are not compatible with resource type {resourceTypeId}.");
+            }
+        }
+    }
+
+    public Task<IReadOnlyList<ResourceTypeAssignment>> GetResourceTypeAssignmentsAsync(
+        IReadOnlyList<int> resourceIds,
+        CancellationToken ct)
+    {
+        return _dataSource.GetResourceTypeAssignmentsAsync(resourceIds, ct);
+    }
+
     private static int ResolveDefinitionId(
         int nodeId,
         IReadOnlyDictionary<int, PropertySchemaNode> nodeMap)

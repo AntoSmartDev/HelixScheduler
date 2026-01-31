@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Xunit;
 
@@ -269,6 +270,161 @@ public sealed class AvailabilityControllerTests : IClassFixture<CustomWebApplica
     public async Task OrGroups_Total_Resources_Over_20_Returns_BadRequest()
     {
         var response = await _client.GetAsync("/api/availability/slots?fromDate=2026-03-09&toDate=2026-03-09&resourceIds=1,2,3,4,5,6,7,8,9,10&orGroups=11,12,13|14,15,16|17,18,19|20,21,22");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AncestorMode_Invalid_Returns_BadRequest()
+    {
+        var response = await _client.GetAsync("/api/availability/slots?fromDate=2026-03-09&toDate=2026-03-09&resourceIds=5,4&includeResourceAncestors=true&ancestorMode=invalid");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AncestorMode_PerGroup_Is_Accepted()
+    {
+        var response = await _client.GetAsync("/api/availability/slots?fromDate=2026-03-09&toDate=2026-03-09&resourceIds=5,4&includeResourceAncestors=true&ancestorMode=perGroup");
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task AncestorMode_Global_Is_Accepted()
+    {
+        var response = await _client.GetAsync("/api/availability/slots?fromDate=2026-03-09&toDate=2026-03-09&resourceIds=5,4&includeResourceAncestors=true&ancestorMode=global");
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task AncestorMode_Invalid_Post_Returns_BadRequest()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 },
+            includeResourceAncestors = true,
+            ancestorMode = "invalid"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AncestorMode_PerGroup_Post_Is_Accepted()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 },
+            includeResourceAncestors = true,
+            ancestorMode = "perGroup"
+        });
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task AncestorMode_Global_Post_Is_Accepted()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 },
+            includeResourceAncestors = true,
+            ancestorMode = "global"
+        });
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Compute_With_SlotDuration_Omitted_Returns_Unchanged()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 }
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        var doc = await JsonDocument.ParseAsync(stream);
+        var slots = doc.RootElement.GetProperty("slots");
+
+        AssertSlots(slots, new[]
+        {
+            "2026-03-09T09:00:00Z-2026-03-09T10:00:00Z",
+            "2026-03-09T11:00:00Z-2026-03-09T13:00:00Z"
+        });
+    }
+
+    [Fact]
+    public async Task Compute_With_SlotDuration_Chunks_Slots()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 },
+            slotDurationMinutes = 60
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        var doc = await JsonDocument.ParseAsync(stream);
+        var slots = doc.RootElement.GetProperty("slots");
+
+        AssertSlots(slots, new[]
+        {
+            "2026-03-09T09:00:00Z-2026-03-09T10:00:00Z",
+            "2026-03-09T11:00:00Z-2026-03-09T12:00:00Z",
+            "2026-03-09T12:00:00Z-2026-03-09T13:00:00Z"
+        });
+    }
+
+    [Fact]
+    public async Task Compute_With_Remainder_Includes_Partial_When_Enabled()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-12",
+            toDate = "2026-03-12",
+            requiredResourceIds = new[] { 4 },
+            slotDurationMinutes = 60,
+            includeRemainderSlot = true
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        var doc = await JsonDocument.ParseAsync(stream);
+        var slots = doc.RootElement.GetProperty("slots");
+
+        AssertSlots(slots, new[]
+        {
+            "2026-03-12T09:00:00Z-2026-03-12T10:00:00Z",
+            "2026-03-12T10:00:00Z-2026-03-12T10:30:00Z",
+            "2026-03-12T11:00:00Z-2026-03-12T12:00:00Z",
+            "2026-03-12T12:00:00Z-2026-03-12T13:00:00Z"
+        });
+    }
+
+    [Fact]
+    public async Task Compute_With_SlotDuration_Invalid_Returns_BadRequest()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-03-09",
+            toDate = "2026-03-09",
+            requiredResourceIds = new[] { 5, 4 },
+            slotDurationMinutes = 0
+        });
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 

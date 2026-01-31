@@ -6,5 +6,11 @@ public sealed record AvailabilityComputeRequest(
     IReadOnlyList<int> RequiredResourceIds,
     IReadOnlyList<int>? PropertyIds = null,
     IReadOnlyList<IReadOnlyList<int>>? ResourceOrGroups = null,
-    bool IncludeDescendants = false,
-    bool Explain = false);
+    bool IncludePropertyDescendants = false,
+    bool Explain = false,
+    bool IncludeResourceAncestors = false,
+    IReadOnlyList<string>? AncestorRelationTypes = null,
+    string? AncestorMode = null,
+    int? SlotDurationMinutes = null,
+    bool IncludeRemainderSlot = false,
+    IReadOnlyList<AncestorPropertyFilter>? AncestorFilters = null);

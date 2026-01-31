@@ -18,8 +18,7 @@ public sealed class ResourceCatalogDataSource : IResourceCatalogDataSource
         CancellationToken ct)
     {
         IQueryable<Resources> query = _dbContext.Resources
-            .AsNoTracking()
-            .Include(resource => resource.Type);
+            .AsNoTracking();
         if (onlySchedulable)
         {
             query = query.Where(resource => resource.IsSchedulable);

@@ -1,4 +1,3 @@
-using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace HelixScheduler.Infrastructure.Persistence.Repositories;
@@ -12,7 +11,7 @@ public sealed class RuleRepository : IRuleRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<Rules>> GetRulesAsync(
+    public async Task<IReadOnlyList<RuleRow>> GetRulesAsync(
         DateOnly fromDateUtc,
         DateOnly toDateUtc,
         IReadOnlyCollection<int> resourceIds,
@@ -20,23 +19,80 @@ public sealed class RuleRepository : IRuleRepository
     {
         if (resourceIds.Count == 0)
         {
-            return Array.Empty<Rules>();
+            return Array.Empty<RuleRow>();
         }
 
-        var query = _dbContext.Rules
+        var rows = await _dbContext.RuleResources
             .AsNoTracking()
-            .Where(rule => rule.RuleResources.Any(link => resourceIds.Contains(link.ResourceId)))
-            .Where(rule =>
-                (rule.SingleDateUtc != null && rule.SingleDateUtc >= fromDateUtc && rule.SingleDateUtc <= toDateUtc) ||
-                (rule.FromDateUtc != null && rule.ToDateUtc != null && rule.FromDateUtc <= toDateUtc && rule.ToDateUtc >= fromDateUtc) ||
-                (rule.FromDateUtc != null && rule.ToDateUtc == null && rule.FromDateUtc <= toDateUtc) ||
-                (rule.FromDateUtc == null && rule.ToDateUtc != null && rule.ToDateUtc >= fromDateUtc) ||
-                (rule.FromDateUtc == null && rule.ToDateUtc == null && rule.SingleDateUtc == null));
-
-        return await query
-            .Include(rule => rule.RuleResources.Where(link => resourceIds.Contains(link.ResourceId)))
-            .Distinct()
+            .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link =>
+                (link.Rule.SingleDateUtc != null && link.Rule.SingleDateUtc >= fromDateUtc && link.Rule.SingleDateUtc <= toDateUtc) ||
+                (link.Rule.FromDateUtc != null && link.Rule.ToDateUtc != null && link.Rule.FromDateUtc <= toDateUtc && link.Rule.ToDateUtc >= fromDateUtc) ||
+                (link.Rule.FromDateUtc != null && link.Rule.ToDateUtc == null && link.Rule.FromDateUtc <= toDateUtc) ||
+                (link.Rule.FromDateUtc == null && link.Rule.ToDateUtc != null && link.Rule.ToDateUtc >= fromDateUtc) ||
+                (link.Rule.FromDateUtc == null && link.Rule.ToDateUtc == null && link.Rule.SingleDateUtc == null))
+            .Select(link => new
+            {
+                link.Rule.Id,
+                link.Rule.Kind,
+                link.Rule.IsExclude,
+                link.Rule.Title,
+                link.Rule.FromDateUtc,
+                link.Rule.ToDateUtc,
+                link.Rule.SingleDateUtc,
+                link.Rule.StartTime,
+                link.Rule.EndTime,
+                link.Rule.DaysOfWeekMask,
+                link.Rule.DayOfMonth,
+                link.Rule.IntervalDays,
+                link.Rule.CreatedAtUtc,
+                ResourceId = link.ResourceId
+            })
             .ToListAsync(ct)
             .ConfigureAwait(false);
+
+        if (rows.Count == 0)
+        {
+            return Array.Empty<RuleRow>();
+        }
+
+        var grouped = rows.GroupBy(row => new
+        {
+            row.Id,
+            row.Kind,
+            row.IsExclude,
+            row.Title,
+            row.FromDateUtc,
+            row.ToDateUtc,
+            row.SingleDateUtc,
+            row.StartTime,
+            row.EndTime,
+            row.DaysOfWeekMask,
+            row.DayOfMonth,
+            row.IntervalDays,
+            row.CreatedAtUtc
+        });
+
+        var result = new List<RuleRow>();
+        foreach (var group in grouped)
+        {
+            result.Add(new RuleRow(
+                group.Key.Id,
+                group.Key.Kind,
+                group.Key.IsExclude,
+                group.Key.Title,
+                group.Key.FromDateUtc,
+                group.Key.ToDateUtc,
+                group.Key.SingleDateUtc,
+                group.Key.StartTime,
+                group.Key.EndTime,
+                group.Key.DaysOfWeekMask,
+                group.Key.DayOfMonth,
+                group.Key.IntervalDays,
+                group.Key.CreatedAtUtc,
+                group.Select(item => item.ResourceId).ToList()));
+        }
+
+        return result;
     }
 }

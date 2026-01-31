@@ -26,6 +26,10 @@ public interface IAvailabilityDataSource
         IReadOnlyList<int> propertyIds,
         CancellationToken ct);
 
+    Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
+        IReadOnlyList<int> propertyIds,
+        CancellationToken ct);
+
     Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(
         bool onlySchedulable,
         CancellationToken ct);
@@ -40,5 +44,10 @@ public interface IAvailabilityDataSource
         DateTime fromUtc,
         DateTime toUtcExclusive,
         IReadOnlyList<int> resourceIds,
+        CancellationToken ct);
+
+    Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
+        IReadOnlyList<int> childResourceIds,
+        IReadOnlyList<string>? relationTypes,
         CancellationToken ct);
 }

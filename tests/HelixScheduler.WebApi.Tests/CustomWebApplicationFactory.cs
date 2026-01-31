@@ -28,33 +28,34 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     private sealed class FakeRuleRepository : IRuleRepository
     {
-        public Task<IReadOnlyList<Rules>> GetRulesAsync(
+        public Task<IReadOnlyList<RuleRow>> GetRulesAsync(
             DateOnly fromDateUtc,
             DateOnly toDateUtc,
             IReadOnlyCollection<int> resourceIds,
             CancellationToken ct)
         {
-            var rules = new List<Rules>();
+            var rules = new List<RuleRow>();
             foreach (var resourceId in resourceIds)
             {
                 var (daysMask, startTime, endTime) = GetRulePattern(resourceId);
-                rules.Add(new Rules
-                {
-                    Id = resourceId,
-                    Kind = (byte)HelixScheduler.Core.RuleKind.RecurringWeekly,
-                    IsExclude = false,
-                    FromDateUtc = null,
-                    ToDateUtc = null,
-                    SingleDateUtc = null,
-                    StartTime = startTime,
-                    EndTime = endTime,
-                    DaysOfWeekMask = daysMask,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    RuleResources = { new RuleResources { RuleId = resourceId, ResourceId = resourceId } }
-                });
+                rules.Add(new RuleRow(
+                    resourceId,
+                    (byte)HelixScheduler.Core.RuleKind.RecurringWeekly,
+                    false,
+                    $"Rule {resourceId}",
+                    null,
+                    null,
+                    null,
+                    startTime,
+                    endTime,
+                    daysMask,
+                    null,
+                    null,
+                    DateTime.UtcNow,
+                    new[] { resourceId }));
             }
 
-            return Task.FromResult<IReadOnlyList<Rules>>(rules);
+            return Task.FromResult<IReadOnlyList<RuleRow>>(rules);
         }
 
         private static (int DaysMask, TimeOnly Start, TimeOnly End) GetRulePattern(int resourceId)
@@ -72,7 +73,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     private sealed class FakeBusyEventRepository : IBusyEventRepository
     {
-        public Task<IReadOnlyList<BusyEvents>> GetBusyAsync(
+        public Task<IReadOnlyList<BusyEventRow>> GetBusyAsync(
             DateTime fromUtc,
             DateTime toUtc,
             IReadOnlyCollection<int> resourceIds,
@@ -81,10 +82,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var list = resourceIds.ToList();
             if (list.Count == 0)
             {
-                return Task.FromResult<IReadOnlyList<BusyEvents>>(Array.Empty<BusyEvents>());
+                return Task.FromResult<IReadOnlyList<BusyEventRow>>(Array.Empty<BusyEventRow>());
             }
 
-            var events = new List<BusyEvents>();
+            var events = new List<BusyEventRow>();
 
             var busyDoctor = CreateBusyEvent(
                 1,
@@ -118,7 +119,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 list.Count > 1 ? new[] { list[0], list[1] } : new[] { list[0] });
             events.Add(busyBoth2026);
 
-            var filtered = new List<BusyEvents>();
+            var filtered = new List<BusyEventRow>();
             for (var i = 0; i < events.Count; i++)
             {
                 var busy = events[i];
@@ -127,52 +128,35 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     continue;
                 }
 
-                var links = busy.BusyEventResources
-                    .Where(link => resourceIds.Contains(link.ResourceId))
+                var links = busy.ResourceIds
+                    .Where(resourceIds.Contains)
                     .ToList();
                 if (links.Count == 0)
                 {
                     continue;
                 }
 
-                busy.BusyEventResources.Clear();
-                foreach (var link in links)
-                {
-                    busy.BusyEventResources.Add(link);
-                }
-
-                filtered.Add(busy);
+                filtered.Add(busy with { ResourceIds = links });
             }
 
-            return Task.FromResult<IReadOnlyList<BusyEvents>>(filtered);
+            return Task.FromResult<IReadOnlyList<BusyEventRow>>(filtered);
         }
 
-        private static BusyEvents CreateBusyEvent(
+        private static BusyEventRow CreateBusyEvent(
             long id,
             string title,
             DateTime startUtc,
             DateTime endUtc,
             IReadOnlyList<int> resourceIds)
         {
-            var busyEvent = new BusyEvents
-            {
-                Id = id,
-                Title = title,
-                StartUtc = startUtc,
-                EndUtc = endUtc,
-                CreatedAtUtc = DateTime.UtcNow
-            };
-
-            for (var i = 0; i < resourceIds.Count; i++)
-            {
-                busyEvent.BusyEventResources.Add(new BusyEventResources
-                {
-                    BusyEventId = id,
-                    ResourceId = resourceIds[i]
-                });
-            }
-
-            return busyEvent;
+            return new BusyEventRow(
+                id,
+                title,
+                startUtc,
+                endUtc,
+                string.Empty,
+                DateTime.UtcNow,
+                resourceIds.ToList());
         }
 
         private static bool Overlaps(DateTime startUtc, DateTime endUtc, DateTime windowStartUtc, DateTime windowEndUtc)
@@ -189,6 +173,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         public Task<IReadOnlyList<int>> GetResourceIdsByPropertiesAsync(
+            IReadOnlyCollection<int> propertyIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+        }
+
+        public Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
             IReadOnlyCollection<int> propertyIds,
             CancellationToken ct)
         {

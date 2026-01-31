@@ -44,14 +44,19 @@ public sealed class AvailabilityQueryParser
             return false;
         }
 
+        TryParseCsvStrings(query.AncestorRelationTypes, out var relationTypes);
+
         input = new AvailabilitySlotsInput(
             from,
             to,
             resourceIds,
             propertyIds,
             orGroups,
-            query.IncludeDescendants,
-            query.Explain);
+            query.IncludePropertyDescendants,
+            query.Explain,
+            query.IncludeResourceAncestors,
+            relationTypes,
+            query.AncestorMode);
         return true;
     }
 
@@ -125,6 +130,27 @@ public sealed class AvailabilityQueryParser
             }
 
             groups.Add(group);
+        }
+
+        return true;
+    }
+
+    private static bool TryParseCsvStrings(string? csv, out List<string> values)
+    {
+        values = new List<string>();
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return true;
+        }
+
+        var parts = csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(parts[i]))
+            {
+                continue;
+            }
+            values.Add(parts[i]);
         }
 
         return true;

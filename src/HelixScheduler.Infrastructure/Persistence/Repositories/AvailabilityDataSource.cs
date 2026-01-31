@@ -40,8 +40,6 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         for (var i = 0; i < rules.Count; i++)
         {
             var rule = rules[i];
-            var resourceIdList = rule.RuleResources.Select(link => link.ResourceId).ToList();
-
             result.Add(new RuleData(
                 rule.Id,
                 rule.Kind,
@@ -54,7 +52,7 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
                 rule.DaysOfWeekMask,
                 rule.DayOfMonth,
                 rule.IntervalDays,
-                resourceIdList));
+                rule.ResourceIds));
         }
 
         return result;
@@ -81,13 +79,11 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         for (var i = 0; i < busyEvents.Count; i++)
         {
             var busy = busyEvents[i];
-            var resourceIdList = busy.BusyEventResources.Select(link => link.ResourceId).ToList();
-
             result.Add(new BusyEventData(
                 busy.Id,
                 busy.StartUtc,
                 busy.EndUtc,
-                resourceIdList));
+                busy.ResourceIds));
         }
 
         return result;
@@ -116,6 +112,13 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         CancellationToken ct)
     {
         return _propertyRepository.GetResourceIdsByPropertiesAsync(propertyIds, ct);
+    }
+
+    public Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
+        IReadOnlyList<int> propertyIds,
+        CancellationToken ct)
+    {
+        return _propertyRepository.GetResourceIdsByAllPropertiesAsync(propertyIds, ct);
     }
 
     public async Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(
@@ -155,8 +158,6 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         for (var i = 0; i < rules.Count; i++)
         {
             var rule = rules[i];
-            var resourceIdList = rule.RuleResources.Select(link => link.ResourceId).ToList();
-
             result.Add(new RuleSummary(
                 rule.Id,
                 rule.Title,
@@ -168,7 +169,7 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
                 rule.StartTime,
                 rule.EndTime,
                 rule.DaysOfWeekMask,
-                resourceIdList));
+                rule.ResourceIds));
         }
 
         return result;
@@ -188,7 +189,6 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         for (var i = 0; i < busyEvents.Count; i++)
         {
             var busy = busyEvents[i];
-            var resourceIdList = busy.BusyEventResources.Select(link => link.ResourceId).ToList();
             var startUtc = DateTime.SpecifyKind(busy.StartUtc, DateTimeKind.Utc);
             var endUtc = DateTime.SpecifyKind(busy.EndUtc, DateTimeKind.Utc);
 
@@ -197,9 +197,38 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
                 busy.Title,
                 startUtc,
                 endUtc,
-                resourceIdList));
+                busy.ResourceIds));
         }
 
         return result;
+    }
+
+    public async Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
+        IReadOnlyList<int> childResourceIds,
+        IReadOnlyList<string>? relationTypes,
+        CancellationToken ct)
+    {
+        if (childResourceIds.Count == 0)
+        {
+            return Array.Empty<ResourceRelationLink>();
+        }
+
+        var query = _dbContext.ResourceRelations.AsNoTracking()
+            .Where(relation => childResourceIds.Contains(relation.ChildResourceId));
+
+        if (relationTypes != null && relationTypes.Count > 0)
+        {
+            query = query.Where(relation => relationTypes.Contains(relation.RelationType));
+        }
+
+        var relations = await query
+            .Select(relation => new ResourceRelationLink(
+                relation.ParentResourceId,
+                relation.ChildResourceId,
+                relation.RelationType))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return relations;
     }
 }

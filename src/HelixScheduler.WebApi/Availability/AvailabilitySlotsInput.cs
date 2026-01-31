@@ -6,6 +6,9 @@ public sealed record AvailabilitySlotsInput(
     List<int> ResourceIds,
     List<int> PropertyIds,
     List<List<int>> OrGroups,
-    bool IncludeDescendants,
-    bool Explain);
+    bool IncludePropertyDescendants,
+    bool Explain,
+    bool IncludeResourceAncestors,
+    List<string> AncestorRelationTypes,
+    string? AncestorMode);
 

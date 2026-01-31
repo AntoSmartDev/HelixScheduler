@@ -16,6 +16,8 @@ const state = {
   propertyMap: new Map(),
   propertyChildren: new Map(),
   selectedPropertyId: null,
+  resourceTypes: [],
+  ancestorFilters: []
 };
 
 const calendarEl = document.getElementById("calendar");
@@ -25,21 +27,78 @@ const busyEl = document.getElementById("busy");
 const explainEl = document.getElementById("explain");
 const weekLabelEl = document.getElementById("weekLabel");
 const busyCalendarEl = document.getElementById("busyCalendar");
-const selectionInfoEl = document.getElementById("selectionInfo");
-const querySummaryEl = document.getElementById("querySummary");
-const computeStatusEl = document.getElementById("computeStatus");
-const propertyGroupsEl = document.getElementById("propertyGroups");
-const propertyChipsEl = document.getElementById("propertyChips");
+  const selectionInfoEl = document.getElementById("selectionInfo");
+  const querySummaryEl = document.getElementById("querySummary");
+  const emptyStateEl = document.getElementById("emptyState");
+  const computeStatusEl = document.getElementById("computeStatus");
+  const propertyGroupsEl = document.getElementById("propertyGroups");
+  const propertyChipsEl = document.getElementById("propertyChips");
+  const propertyFilterNoticeEl = document.getElementById("propertyFilterNotice");
 const apiStatusEl = document.getElementById("apiStatus");
 const apiStatusMessageEl = document.getElementById("apiStatusMessage");
 const apiRetryEl = document.getElementById("apiRetry");
+const payloadPreviewEl = document.getElementById("payloadPreview");
+  const copyPayloadBtn = document.getElementById("copyPayload");
+  const ancestorFilterTypeEl = document.getElementById("ancestorFilterType");
+const ancestorFilterDefinitionEl = document.getElementById("ancestorFilterDefinition");
+const ancestorFilterPropertyEl = document.getElementById("ancestorFilterProperty");
+const ancestorFilterIncludeDescendantsEl = document.getElementById("ancestorFilterIncludeDescendants");
+const ancestorFilterMatchModeEl = document.getElementById("ancestorFilterMatchMode");
+const ancestorFilterScopeEl = document.getElementById("ancestorFilterScope");
+const ancestorFilterMatchAllEl = document.getElementById("ancestorFilterMatchAll");
+const ancestorFilterChipsEl = document.getElementById("ancestorFilterChips");
+const ancestorTypesWrapEl = document.getElementById("ancestorTypesWrap");
+const ancestorFiltersWrapEl = document.getElementById("ancestorFiltersWrap");
+const ancestorTypesAllEl = document.getElementById("ancestorTypesAll");
+const ancestorTypesSpecificEl = document.getElementById("ancestorTypesSpecific");
+const slotDurationWrapEl = document.getElementById("slotDurationWrap");
+const includeRemainderWrapEl = document.getElementById("includeRemainderWrap");
 let apiCheckInFlight = false;
 
-document.getElementById("prevWeek").addEventListener("click", () => shiftWeek(-7));
-document.getElementById("nextWeek").addEventListener("click", () => shiftWeek(7));
-document.getElementById("refresh").addEventListener("click", () => loadAll());
-document.getElementById("resetDemo").addEventListener("click", () => resetDemo());
-apiRetryEl.addEventListener("click", () => retryApiReady());
+  document.getElementById("prevWeek").addEventListener("click", () => shiftWeek(-7));
+  document.getElementById("nextWeek").addEventListener("click", () => shiftWeek(7));
+  document.getElementById("refresh").addEventListener("click", () => loadAll());
+  document.getElementById("resetDemo").addEventListener("click", () => resetDemo());
+  apiRetryEl.addEventListener("click", () => retryApiReady());
+  const showIdsToggle = document.getElementById("toggleShowIds");
+  if (showIdsToggle) {
+    showIdsToggle.addEventListener("change", () => {
+      refreshUiFromState();
+    });
+  }
+  document.body.addEventListener("click", event => {
+    const link = event.target.closest(".empty-actions a");
+    if (!link || !link.getAttribute("href")?.startsWith("#")) {
+      return;
+    }
+    event.preventDefault();
+    const target = document.querySelector(link.getAttribute("href"));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+const addAncestorFilterBtn = document.getElementById("addAncestorFilter");
+const clearAncestorFiltersBtn = document.getElementById("clearAncestorFilters");
+if (addAncestorFilterBtn) {
+  addAncestorFilterBtn.addEventListener("click", () => addAncestorFilter());
+}
+if (clearAncestorFiltersBtn) {
+  clearAncestorFiltersBtn.addEventListener("click", () => clearAncestorFilters());
+}
+if (ancestorFilterTypeEl) {
+  ancestorFilterTypeEl.addEventListener("change", () => {
+    renderAncestorFilterDefinitions();
+    renderAncestorFilterProperties();
+  });
+}
+if (ancestorFilterDefinitionEl) {
+  ancestorFilterDefinitionEl.addEventListener("change", () => {
+    renderAncestorFilterProperties();
+  });
+}
+if (copyPayloadBtn) {
+  copyPayloadBtn.addEventListener("click", () => copyPayload());
+}
 document.getElementById("toggleDescendants").addEventListener("change", () => {
   if (!state.selectedPropertyId) {
     return;
@@ -49,6 +108,23 @@ document.getElementById("toggleDescendants").addEventListener("change", () => {
   renderResourceList();
   loadAll();
 });
+document.getElementById("toggleAncestors").addEventListener("change", () => {
+  updateAncestorTypesVisibility();
+  loadAll();
+});
+document.getElementById("toggleSlotDuration").addEventListener("change", () => {
+  updateSlotDurationVisibility();
+  loadAll();
+});
+document.querySelectorAll("input[name=\"ancestorRelationType\"]").forEach(input => {
+  input.addEventListener("change", () => loadAll());
+});
+if (ancestorTypesAllEl) {
+  ancestorTypesAllEl.addEventListener("change", () => {
+    updateAncestorTypesState();
+    loadAll();
+  });
+}
 
 function createElement(tag, className, text) {
   const el = document.createElement(tag);
@@ -60,6 +136,18 @@ function createElement(tag, className, text) {
   }
   return el;
 }
+
+function refreshUiFromState() {
+  renderResourceList();
+  renderPropertyGroups();
+  renderPropertyChips();
+  renderQuerySummary();
+  renderRules(state.rules || []);
+  renderBusy(state.busyEvents || []);
+  renderBusyCalendar(state.busyEvents || []);
+}
+
+
 
 function isoDate(date) {
   return date.toISOString().slice(0, 10);
@@ -125,6 +213,15 @@ async function loadResources() {
   renderResourceList();
 }
 
+async function loadResourceTypes() {
+  const res = await fetch(`${state.apiBaseUrl}/api/catalog/resource-types`);
+  if (!res.ok) {
+    return;
+  }
+  state.resourceTypes = await res.json();
+  renderAncestorFilterTypes();
+}
+
 async function loadPropertyCatalog() {
   const res = await fetch(`${state.apiBaseUrl}/api/catalog/properties`);
   if (!res.ok) {
@@ -141,11 +238,11 @@ async function loadPropertyCatalog() {
   renderPropertyGroups();
 }
 
-function renderResourceList() {
-  if (state.resources.length === 0) {
-    resourceListEl.textContent = "No resources.";
-    return;
-  }
+  function renderResourceList(options = {}) {
+    if (state.resources.length === 0) {
+      resourceListEl.textContent = "No resources.";
+      return;
+    }
 
   resourceListEl.innerHTML = "";
   const filteredResources = filterResourcesByProperty(state.resources);
@@ -158,16 +255,25 @@ function renderResourceList() {
   const validIds = new Set(filteredResources.map(r => r.id));
   state.selectedIds = new Set(Array.from(state.selectedIds).filter(id => validIds.has(id)));
 
-  const grouped = groupResourcesByType(filteredResources);
-  grouped.forEach(({ typeLabel, items }) => {
-    const title = document.createElement("div");
-    title.className = "resource-group-title";
-    title.textContent = `Type: ${typeLabel}`;
-    resourceListEl.appendChild(title);
+    const grouped = groupResourcesByType(filteredResources);
+    grouped.forEach(({ typeLabel, items }) => {
+      const group = document.createElement("details");
+      group.className = "resource-group";
+      group.open = true;
+      const summary = document.createElement("summary");
+      summary.className = "resource-group-title";
+      summary.innerHTML = `
+        <span class="resource-group-label">Type: ${typeLabel}</span>
+        <span class="summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" role="img" focusable="false">
+            <path d="M5 7l5 6 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>`;
+      group.appendChild(summary);
 
-    items.forEach(resource => {
-    const item = document.createElement("label");
-    item.className = "resource-item";
+      items.forEach(resource => {
+      const item = document.createElement("label");
+      item.className = "resource-item";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = state.selectedIds.has(resource.id);
@@ -181,7 +287,7 @@ function renderResourceList() {
       loadAll();
     });
     const name = document.createElement("span");
-    name.textContent = `${resource.name} (#${resource.id})`;
+      name.textContent = DemoFormat.formatIdLabel(resource.name, resource.id);
     const typeLabel = resource.typeLabel || "Unknown";
     const typeMeta = document.createElement("span");
     typeMeta.className = "type-pill";
@@ -203,34 +309,28 @@ function renderResourceList() {
       props.classList.add("visible");
     }
     item.appendChild(props);
-    resourceListEl.appendChild(item);
+      group.appendChild(item);
+      });
+      resourceListEl.appendChild(group);
     });
-  });
 
-  refreshPropertyFilterForResources();
+  if (!options.skipRefresh) {
+    const cleared = refreshPropertyFilterForResources();
+    if (cleared) {
+      renderResourceList({ skipRefresh: true });
+      loadAll();
+    }
+  }
 }
 
-async function loadAvailability() {
-  const explain = document.getElementById("toggleExplain").checked;
-  const includeDescendants = document.getElementById("toggleDescendants").checked;
-  const fromDate = isoDate(state.weekStart);
-  const toDate = isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
-  const resourceIds = Array.from(state.selectedIds);
-
-  if (resourceIds.length === 0) {
-    renderCalendar([]);
-    renderExplain([]);
-    return;
-  }
-
-  const payload = {
-    fromDate,
-    toDate,
-    requiredResourceIds: resourceIds,
-    propertyIds: state.propertyIds,
-    includeDescendants,
-    explain,
-  };
+  async function loadAvailability() {
+    const payload = buildAvailabilityPayload();
+    if (!payload) {
+      renderCalendar([]);
+      renderExplain([]);
+      renderEmptyState([], []);
+      return;
+    }
 
   const res = await fetch(`${state.apiBaseUrl}/api/availability/compute`, {
     method: "POST",
@@ -243,9 +343,312 @@ async function loadAvailability() {
     throw new Error(text || "Availability request failed.");
   }
 
-  const data = await res.json();
-  renderCalendar(data.slots || []);
-  renderExplain(data.explanations || []);
+    const data = await res.json();
+    renderCalendar(data.slots || []);
+    renderExplain(data.explanations || []);
+    renderEmptyState(data.slots || [], data.explanations || []);
+  }
+
+function parseAncestorTypes() {
+  if (ancestorTypesAllEl?.checked) {
+    return [];
+  }
+  const inputs = document.querySelectorAll("input[name=\"ancestorRelationType\"]");
+  const selected = [];
+  inputs.forEach(input => {
+    if (input.checked) {
+      selected.push(input.value);
+    }
+  });
+  return selected;
+}
+
+function parseSlotDurationMinutes() {
+  const enabled = document.getElementById("toggleSlotDuration")?.checked;
+  if (!enabled) {
+    return null;
+  }
+  const input = document.getElementById("slotDurationMinutes");
+  if (!input) {
+    return null;
+  }
+  const value = Number.parseInt(input.value, 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function buildAvailabilityPayload() {
+  const resourceIds = Array.from(state.selectedIds);
+  if (resourceIds.length === 0) {
+    renderPayloadPreview(null);
+    return null;
+  }
+
+  const explain = document.getElementById("toggleExplain").checked;
+  const includeDescendants = document.getElementById("toggleDescendants").checked;
+  const includeAncestorsToggle = document.getElementById("toggleAncestors").checked;
+  const ancestorTypes = parseAncestorTypes();
+  const slotDurationMinutes = parseSlotDurationMinutes();
+  const includeRemainderSlot = document.getElementById("includeRemainderSlot").checked;
+  const ancestorFilters = buildAncestorFiltersPayload();
+  const includeAncestors = includeAncestorsToggle || ancestorFilters.length > 0;
+  const ancestorMode = includeAncestors ? "perGroup" : null;
+  const fromDate = isoDate(state.weekStart);
+  const toDate = isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
+
+  const payload = {
+    fromDate,
+    toDate,
+    requiredResourceIds: resourceIds,
+    propertyIds: state.propertyIds,
+    includePropertyDescendants: includeDescendants,
+    explain,
+    includeResourceAncestors: includeAncestors,
+    ancestorRelationTypes: ancestorTypes.length > 0 ? ancestorTypes : null,
+    ancestorMode,
+    slotDurationMinutes: slotDurationMinutes ?? null,
+    includeRemainderSlot: slotDurationMinutes ? includeRemainderSlot : false,
+    ancestorFilters: ancestorFilters.length > 0 ? ancestorFilters : null
+  };
+
+  renderPayloadPreview(payload);
+  return payload;
+}
+
+function renderPayloadPreview(payload) {
+  if (!payloadPreviewEl) {
+    return;
+  }
+  if (!payload) {
+    payloadPreviewEl.textContent = "Select resources to see payload.";
+    return;
+  }
+  payloadPreviewEl.textContent = JSON.stringify(payload, null, 2);
+}
+
+async function copyPayload() {
+  if (!payloadPreviewEl) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(payloadPreviewEl.textContent);
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = payloadPreviewEl.textContent;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+}
+
+function renderAncestorFilterTypes() {
+  if (!ancestorFilterTypeEl) {
+    return;
+  }
+  ancestorFilterTypeEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select type";
+  ancestorFilterTypeEl.appendChild(placeholder);
+  const sorted = [...state.resourceTypes].sort((a, b) => a.label.localeCompare(b.label));
+  sorted.forEach(type => {
+    const option = document.createElement("option");
+    option.value = type.id;
+    option.textContent = DemoFormat.formatTypeLabel(type);
+    ancestorFilterTypeEl.appendChild(option);
+  });
+}
+
+function renderAncestorFilterDefinitions() {
+  if (!ancestorFilterDefinitionEl) {
+    return;
+  }
+  ancestorFilterDefinitionEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select definition";
+  ancestorFilterDefinitionEl.appendChild(placeholder);
+  const typeId = Number(ancestorFilterTypeEl.value);
+  if (!Number.isFinite(typeId) || typeId <= 0) {
+    return;
+  }
+  const allowed = state.typePropertyMap.get(typeId);
+  if (!allowed || allowed.size === 0) {
+    return;
+  }
+  const defs = Array.from(allowed)
+    .map(id => state.propertyDefinitions.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label));
+  defs.forEach(def => {
+    const option = document.createElement("option");
+    option.value = def.id;
+    option.textContent = DemoFormat.formatDefinitionLabel(def);
+    ancestorFilterDefinitionEl.appendChild(option);
+  });
+}
+
+function renderAncestorFilterProperties() {
+  if (!ancestorFilterPropertyEl) {
+    return;
+  }
+  ancestorFilterPropertyEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select property";
+  ancestorFilterPropertyEl.appendChild(placeholder);
+
+  const definitionId = Number(ancestorFilterDefinitionEl.value);
+  if (!Number.isFinite(definitionId) || definitionId <= 0) {
+    return;
+  }
+  appendPropertyTreeOptions(ancestorFilterPropertyEl, definitionId, null);
+}
+
+function addAncestorFilter() {
+  if (!ancestorFilterTypeEl || !ancestorFilterPropertyEl) {
+    return;
+  }
+  const typeId = Number(ancestorFilterTypeEl.value);
+  const propertyId = Number(ancestorFilterPropertyEl.value);
+  if (!Number.isFinite(typeId) || typeId <= 0 || !Number.isFinite(propertyId) || propertyId <= 0) {
+    return;
+  }
+
+  const filter = {
+    resourceTypeId: typeId,
+    propertyIds: [propertyId],
+    includePropertyDescendants: ancestorFilterIncludeDescendantsEl?.checked ?? false,
+    matchMode: ancestorFilterMatchModeEl?.value || "or",
+    scope: ancestorFilterScopeEl?.value || "anyAncestor",
+    matchAllAncestors: ancestorFilterMatchAllEl?.checked ?? false
+  };
+
+  const existing = state.ancestorFilters.find(item =>
+    item.resourceTypeId === filter.resourceTypeId
+    && item.includePropertyDescendants === filter.includePropertyDescendants
+    && item.matchMode === filter.matchMode
+    && item.scope === filter.scope
+    && item.matchAllAncestors === filter.matchAllAncestors);
+
+  if (existing) {
+    if (!existing.propertyIds.includes(propertyId)) {
+      existing.propertyIds.push(propertyId);
+    }
+  } else {
+    state.ancestorFilters.push(filter);
+  }
+
+  renderAncestorFilterChips();
+  updateAncestorTypesVisibility();
+  loadAll();
+}
+
+function clearAncestorFilters() {
+  state.ancestorFilters = [];
+  renderAncestorFilterChips();
+  updateAncestorTypesVisibility();
+  loadAll();
+}
+
+function renderAncestorFilterChips() {
+  if (!ancestorFilterChipsEl) {
+    return;
+  }
+  if (state.ancestorFilters.length === 0) {
+    ancestorFilterChipsEl.textContent = "No ancestor filters.";
+    return;
+  }
+
+  ancestorFilterChipsEl.innerHTML = "";
+  state.ancestorFilters.forEach((filter, index) => {
+    const typeLabel = state.resourceTypes.find(t => t.id === filter.resourceTypeId)?.label || `Type ${filter.resourceTypeId}`;
+    const propertyLabels = filter.propertyIds
+      .map(id => DemoFormat.formatPropertyLabelSimple(id, state.propertyMap))
+      .join(", ");
+    const chip = createElement(
+      "span",
+      "chip",
+      `${typeLabel}: ${propertyLabels} | ${filter.matchMode} | ${filter.scope}${filter.matchAllAncestors ? " | all ancestors" : ""}`);
+    const remove = createElement("button", "btn ghost small", "x");
+    remove.addEventListener("click", () => {
+      state.ancestorFilters.splice(index, 1);
+      renderAncestorFilterChips();
+      updateAncestorTypesVisibility();
+      loadAll();
+    });
+    chip.appendChild(remove);
+    ancestorFilterChipsEl.appendChild(chip);
+  });
+}
+
+function buildAncestorFiltersPayload() {
+  return state.ancestorFilters.map(filter => ({
+    resourceTypeId: filter.resourceTypeId,
+    propertyIds: filter.propertyIds,
+    includePropertyDescendants: filter.includePropertyDescendants,
+    matchMode: filter.matchMode,
+    scope: filter.scope,
+    matchAllAncestors: filter.matchAllAncestors
+  }));
+}
+
+function updateAncestorTypesVisibility() {
+  const includeAncestors = document.getElementById("toggleAncestors").checked;
+  if (ancestorTypesWrapEl) {
+    ancestorTypesWrapEl.style.display = includeAncestors || state.ancestorFilters.length > 0 ? "block" : "none";
+  }
+  if (!ancestorFiltersWrapEl) {
+    return;
+  }
+  ancestorFiltersWrapEl.style.display = includeAncestors || state.ancestorFilters.length > 0 ? "block" : "none";
+  updateAncestorTypesState();
+}
+
+function updateAncestorTypesState() {
+  if (!ancestorTypesAllEl) {
+    return;
+  }
+  const inputs = document.querySelectorAll("input[name=\"ancestorRelationType\"]");
+  if (ancestorTypesAllEl.checked) {
+    if (ancestorTypesSpecificEl) {
+      ancestorTypesSpecificEl.style.display = "none";
+    }
+    inputs.forEach(input => {
+      input.checked = true;
+      input.disabled = true;
+    });
+  } else {
+    if (ancestorTypesSpecificEl) {
+      ancestorTypesSpecificEl.style.display = "flex";
+    }
+    inputs.forEach(input => {
+      input.disabled = false;
+    });
+  }
+}
+
+function updateSlotDurationVisibility() {
+  if (!slotDurationWrapEl) {
+    return;
+  }
+  const enabled = document.getElementById("toggleSlotDuration")?.checked;
+  slotDurationWrapEl.style.display = enabled ? "block" : "none";
+  if (!enabled) {
+    const input = document.getElementById("slotDurationMinutes");
+    if (input) {
+      input.value = "";
+    }
+    const includeRemainderEl = document.getElementById("includeRemainderSlot");
+    if (includeRemainderEl) {
+      includeRemainderEl.checked = false;
+    }
+    if (includeRemainderWrapEl) {
+      includeRemainderWrapEl.style.display = "none";
+    }
+  } else if (includeRemainderWrapEl) {
+    includeRemainderWrapEl.style.display = "flex";
+  }
 }
 
 async function loadDemoSummary() {
@@ -281,9 +684,19 @@ async function loadDemoSummary() {
 }
 
 function renderCalendar(slots) {
-  calendarEl.innerHTML = "";
-  const days = Array.from({ length: 7 }, (_, idx) => {
-    const date = new Date(state.weekStart);
+    if (!calendarEl) {
+      return;
+    }
+    if (!slots || slots.length === 0) {
+      calendarEl.innerHTML = "";
+      calendarEl.classList.add("empty");
+      calendarEl.innerHTML = "<div class=\"empty-message\">No availability slots for the selected range.</div>";
+      return;
+    }
+    calendarEl.classList.remove("empty");
+    calendarEl.innerHTML = "";
+    const days = Array.from({ length: 7 }, (_, idx) => {
+      const date = new Date(state.weekStart);
     date.setUTCDate(date.getUTCDate() + idx);
     return { date, slots: [] };
   });
@@ -387,25 +800,23 @@ function renderRules(rules) {
 
   rulesEl.innerHTML = "";
   rules.forEach(rule => {
-    const card = document.createElement("div");
-    card.className = "card rule-card";
+      const card = document.createElement("div");
+      card.className = "card rule-card";
+      card.title = "Click to highlight related slots.";
     card.dataset.ruleId = rule.id;
-    const resourceNames = rule.resourceIds
-      .map(id => state.resourceMap.get(id)?.name || `#${id}`)
-      .join(", ");
     const dateRange = formatRuleDateRange(rule);
-    const title = createElement("strong", null, rule.title || `Rule ${rule.id}`);
+    const titleText = rule.title || DemoFormat.formatRuleLabel(rule);
+    const title = createElement("strong", null, titleText);
     card.appendChild(title);
     card.appendChild(document.createTextNode(" "));
-    card.appendChild(createElement("span", "slot-meta", `Rule #${rule.id}`));
-    card.appendChild(createElement("br"));
-    if (dateRange) {
-      card.appendChild(document.createTextNode(dateRange));
-      card.appendChild(createElement("br"));
-    }
-    card.appendChild(document.createTextNode(`${formatTimeRange(rule.startTime, rule.endTime)} UTC`));
-    card.appendChild(createElement("br"));
-    appendResourceTags(card, rule.resourceIds);
+      const metaRow = createElement("div", "rule-meta");
+      metaRow.appendChild(createElement("span", "slot-meta", DemoFormat.formatRuleLabel(rule)));
+      metaRow.appendChild(createElement("span", "rule-time", `${formatTimeRange(rule.startTime, rule.endTime)} UTC`));
+      card.appendChild(metaRow);
+      if (dateRange) {
+        card.appendChild(createElement("div", "rule-date", dateRange));
+      }
+      appendResourceTags(card, rule.resourceIds);
     card.addEventListener("click", () => handleRuleSelection(rule));
     rulesEl.appendChild(card);
   });
@@ -422,14 +833,10 @@ function renderBusy(busyEvents) {
     const card = document.createElement("div");
     card.className = "card busy-card";
     card.dataset.busyId = busy.id;
-    const resourceNames = busy.resourceIds
-      .map(id => state.resourceMap.get(id)?.name || `#${id}`)
-      .join(", ");
-    card.appendChild(createElement("strong", null, busy.title || `Busy ${busy.id}`));
-    card.appendChild(createElement("br"));
-    card.appendChild(createElement("span", null, `${formatUtcDateTime(busy.startUtc)} - ${formatUtcDateTime(busy.endUtc)}`));
-    card.appendChild(createElement("br"));
-    appendResourceTags(card, busy.resourceIds);
+    const titleText = busy.title || DemoFormat.formatBusyLabel(busy);
+      card.appendChild(createElement("strong", null, titleText));
+      card.appendChild(createElement("div", "rule-time", `${formatUtcDateTime(busy.startUtc)} - ${formatUtcDateTime(busy.endUtc)}`));
+      appendResourceTags(card, busy.resourceIds);
     card.addEventListener("click", () => handleBusySelection(busy));
     busyEl.appendChild(card);
   });
@@ -457,20 +864,21 @@ function renderPropertyChips() {
     const definition = node ? state.propertyDefinitions.get(node.definitionId) : null;
     const prefix = definition ? `${definition.label}: ` : "";
     const label = node?.label || `#${id}`;
-    chip.textContent = `${prefix}${label} (#${id})`;
+      chip.textContent = `${prefix}${DemoFormat.formatIdLabel(label, id)}`;
     propertyChipsEl.appendChild(chip);
   });
 }
 
-function renderQuerySummary() {
-  if (!querySummaryEl) {
-    return;
-  }
+  function renderQuerySummary() {
+    if (!querySummaryEl) {
+      return;
+    }
+    const bodyEl = querySummaryEl.querySelector(".query-summary-body") ?? querySummaryEl;
 
-  const fromDate = isoDate(state.weekStart);
-  const toDate = isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
-  const explain = document.getElementById("toggleExplain").checked;
-  const includeDesc = document.getElementById("toggleDescendants").checked;
+    const fromDate = isoDate(state.weekStart);
+    const toDate = isoDate(new Date(state.weekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
+    const explain = document.getElementById("toggleExplain").checked;
+    const includeDesc = document.getElementById("toggleDescendants").checked;
 
   const resources = Array.from(state.selectedIds).map(id => {
     const resource = state.resourceMap.get(id);
@@ -489,12 +897,23 @@ function renderQuerySummary() {
     : null;
   const intent = buildExplorerIntent(resources, propertyText);
 
-  querySummaryEl.innerHTML = "";
-  querySummaryEl.appendChild(createElement("strong", null, "Current availability query"));
-  querySummaryEl.appendChild(buildSummaryRow("Intent", intent));
-  querySummaryEl.appendChild(buildSummaryRow("Range", `Week ${fromDate} -> ${toDate}`));
-  querySummaryEl.appendChild(buildSummaryRow("Explain", explain ? "On" : "Off"));
-}
+    bodyEl.innerHTML = "";
+    bodyEl.appendChild(buildSummaryRow("Intent", intent));
+    bodyEl.appendChild(buildSummaryRow("Range", `Week ${fromDate} -> ${toDate}`));
+    bodyEl.appendChild(buildSummaryRow("Health", formatQueryHealthSummary()));
+    bodyEl.appendChild(buildSummaryRow("Explain", explain ? "On" : "Off"));
+    bodyEl.appendChild(buildSummaryRow("Ancestors", formatAncestorSummary()));
+    bodyEl.appendChild(buildSummaryRow("Relation types", formatRelationTypesSummary()));
+    bodyEl.appendChild(buildSummaryRow("Ancestor filters", formatAncestorFiltersSummary()));
+    bodyEl.appendChild(buildSummaryRow("Slot duration", formatSlotDurationSummary()));
+  }
+
+  function formatQueryHealthSummary() {
+    const resourceCount = state.selectedIds.size;
+    const propertyCount = state.selectedPropertyId ? 1 : 0;
+    const label = resourceCount === 0 ? "Incomplete" : "Ready";
+    return `${label} · Resources ${resourceCount} · Property filters ${propertyCount}`;
+  }
 
 function formatPropertyLabel(propertyId, includeDesc) {
   const node = state.propertyMap.get(propertyId);
@@ -503,8 +922,51 @@ function formatPropertyLabel(propertyId, includeDesc) {
   }
   const definition = state.propertyDefinitions.get(node.definitionId);
   const prefix = definition ? `${definition.label}: ` : "";
-  const suffix = includeDesc ? " (include descendants)" : "";
-  return `${prefix}${node.label}${suffix}`;
+  const suffix = includeDesc ? " (include property descendants)" : "";
+  return `${prefix}${DemoFormat.formatIdLabel(node.label, node.id)}${suffix}`;
+}
+
+function formatAncestorSummary() {
+  const includeAncestors = document.getElementById("toggleAncestors").checked;
+  return includeAncestors ? "On" : "Off";
+}
+
+function formatRelationTypesSummary() {
+  const includeAncestors = document.getElementById("toggleAncestors").checked;
+  if (!includeAncestors) {
+    return "n/a";
+  }
+  if (ancestorTypesAllEl?.checked) {
+    return "All";
+  }
+  const types = parseAncestorTypes();
+  return types.length > 0 ? types.join(", ") : "All";
+}
+
+function formatAncestorFiltersSummary() {
+  if (state.ancestorFilters.length === 0) {
+    return "None";
+  }
+  const formatted = state.ancestorFilters.map(filter => {
+    const typeLabel = state.resourceTypes.find(t => t.id === filter.resourceTypeId)?.label || `#${filter.resourceTypeId}`;
+    const propertyLabels = filter.propertyIds
+      .map(id => DemoFormat.formatPropertyLabelSimple(id, state.propertyMap))
+      .join(", ");
+    return `${typeLabel}: ${propertyLabels}`;
+  });
+  if (formatted.length <= 2) {
+    return formatted.join(" | ");
+  }
+  return `${formatted.slice(0, 2).join(" | ")} +${formatted.length - 2} more`;
+}
+
+function formatSlotDurationSummary() {
+  const slotDurationMinutes = parseSlotDurationMinutes();
+  if (!slotDurationMinutes) {
+    return "Off";
+  }
+  const includeRemainder = document.getElementById("includeRemainderSlot").checked ? "on" : "off";
+  return `${slotDurationMinutes} min (remainder ${includeRemainder})`;
 }
 
 function buildExplorerIntent(resources, propertyText) {
@@ -518,7 +980,8 @@ function buildExplorerIntent(resources, propertyText) {
     if (!grouped.has(type)) {
       grouped.set(type, []);
     }
-    grouped.get(type).push(resource.name || "Unknown");
+    const name = resource.name ? DemoFormat.formatIdLabel(resource.name, resource.id) : "Unknown";
+    grouped.get(type).push(name);
   });
 
   const clauses = Array.from(grouped.entries()).map(([type, names]) => {
@@ -614,10 +1077,11 @@ function intersectSets(left, right) {
 }
 
 function refreshPropertyFilterForResources() {
+  let cleared = false;
   if (!state.selectedPropertyId) {
     renderPropertyGroups();
     renderPropertyChips();
-    return;
+    return false;
   }
 
   const allowed = getAllowedDefinitionIds();
@@ -626,33 +1090,107 @@ function refreshPropertyFilterForResources() {
     if (!node || !allowed.has(node.definitionId)) {
       state.selectedPropertyId = null;
       state.propertyIds = [];
+      cleared = true;
     }
+  }
+
+  if (cleared && state.selectedIds.size === 0 && state.resources.length > 0) {
+    state.selectedIds = new Set(state.resources.slice(0, 2).map(r => r.id));
   }
 
   renderPropertyGroups();
   renderPropertyChips();
+  if (propertyFilterNoticeEl) {
+    if (cleared) {
+      propertyFilterNoticeEl.textContent =
+        "Property filter reset: it applies only to non-schedulable resources. Use Search to filter those.";
+      propertyFilterNoticeEl.style.display = "block";
+    } else {
+      propertyFilterNoticeEl.textContent = "";
+      propertyFilterNoticeEl.style.display = "none";
+    }
+  }
+  return cleared;
 }
 
-function renderExplain(explanations) {
-  if (!document.getElementById("toggleExplain").checked) {
-    explainEl.textContent = "Explain disabled.";
-    return;
+  function renderExplain(explanations) {
+    if (!document.getElementById("toggleExplain").checked) {
+      explainEl.textContent = "Explain disabled.";
+      return;
   }
   if (explanations.length === 0) {
     explainEl.textContent = "No explanations.";
     return;
   }
   explainEl.innerHTML = "";
-  explanations.forEach(exp => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <strong>${exp.reason}</strong><br/>
-      ${exp.message}
-    `;
-    explainEl.appendChild(card);
-  });
-}
+    explanations.forEach(exp => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <strong>${exp.reason}</strong><br/>
+        ${exp.message}
+      `;
+      explainEl.appendChild(card);
+    });
+  }
+
+  function renderEmptyState(slots, explanations) {
+    if (!emptyStateEl) {
+      return;
+    }
+    if (slots && slots.length > 0) {
+      emptyStateEl.style.display = "none";
+      emptyStateEl.textContent = "";
+      return;
+    }
+
+    const resourceCount = state.selectedIds.size;
+    const propertyCount = state.selectedPropertyId ? 1 : 0;
+    const reason = explanations?.[0]?.reason ?? null;
+    const lines = [];
+
+    if (resourceCount === 0) {
+      lines.push("Select at least one resource.");
+    } else {
+      switch (reason) {
+        case "NoPositiveRule":
+          lines.push("No positive rules apply in this range.");
+          break;
+        case "FullyBlockedByBusy":
+          lines.push("Busy events block availability in this range.");
+          break;
+        case "FullyBlockedByNegativeRule":
+          lines.push("Negative rules block availability in this range.");
+          break;
+        case "PartiallyBlocked":
+          lines.push("Rules or busy events block availability in this range.");
+          break;
+        default:
+          lines.push("No availability found for the current filters.");
+          break;
+      }
+      if (propertyCount > 0) {
+        lines.push("Property filters may be too restrictive.");
+      }
+      lines.push("Try widening the date range or adjusting filters.");
+    }
+
+    emptyStateEl.innerHTML = "";
+    emptyStateEl.appendChild(createElement("strong", null, "No availability found"));
+    lines.forEach(text => {
+      emptyStateEl.appendChild(createElement("div", null, text));
+    });
+    const quick = createElement("div", "empty-actions");
+    const rulesLink = createElement("a", "link", "See rules");
+    rulesLink.href = "#rules";
+    const busyLink = createElement("a", "link", "See busy calendar");
+    busyLink.href = "#busyCalendar";
+    quick.appendChild(rulesLink);
+    quick.appendChild(document.createTextNode(" · "));
+    quick.appendChild(busyLink);
+    emptyStateEl.appendChild(quick);
+    emptyStateEl.style.display = "block";
+  }
 
 function renderPropertyGroups() {
   if (!propertyGroupsEl) {
@@ -666,16 +1204,18 @@ function renderPropertyGroups() {
   }
 
   const typeLabelMap = buildTypeLabelMap();
+  const schedulableTypeIds = new Set(state.resources.map(resource => resource.typeId));
   const entries = Array.from(state.typePropertyMap.entries())
     .map(([typeId, defs]) => ({
       typeId,
       typeLabel: typeLabelMap.get(typeId) || `Type #${typeId}`,
       definitionIds: Array.from(defs)
     }))
+    .filter(entry => schedulableTypeIds.size === 0 || schedulableTypeIds.has(entry.typeId))
     .sort((a, b) => a.typeLabel.localeCompare(b.typeLabel));
 
   if (entries.length === 0) {
-    propertyGroupsEl.textContent = "No properties.";
+    propertyGroupsEl.textContent = "No properties for schedulable resources.";
     return;
   }
 
@@ -700,24 +1240,9 @@ function renderPropertyGroups() {
 
     definitionIds.forEach(definitionId => {
       const definition = state.propertyDefinitions.get(definitionId);
-      const nodes = state.propertyNodes
-        .filter(node => node.definitionId === definitionId && node.parentId != null)
-        .sort((a, b) => a.label.localeCompare(b.label));
-      if (nodes.length === 0) {
-        return;
-      }
-
       const optGroup = document.createElement("optgroup");
       optGroup.label = definition ? definition.label : `Definition #${definitionId}`;
-      nodes.forEach(node => {
-        const option = document.createElement("option");
-        option.value = node.id;
-        option.textContent = `${node.label} (#${node.id})`;
-        if (selectedNode && selectedNode.id === node.id) {
-          option.selected = true;
-        }
-        optGroup.appendChild(option);
-      });
+      appendPropertyTreeOptions(optGroup, definitionId, selectedNode?.id ?? null);
       select.appendChild(optGroup);
     });
 
@@ -753,16 +1278,53 @@ function buildPropertyChildrenMap(properties) {
   return map;
 }
 
+function appendPropertyTreeOptions(container, definitionId, selectedNodeId) {
+  const rootNode = getDefinitionRootNode(definitionId);
+  if (!rootNode) {
+    return;
+  }
+
+  const anyOption = document.createElement("option");
+  anyOption.value = rootNode.id;
+  anyOption.textContent = `Any ${DemoFormat.formatIdLabel(rootNode.label, rootNode.id)}`;
+  if (selectedNodeId === rootNode.id) {
+    anyOption.selected = true;
+  }
+  container.appendChild(anyOption);
+
+  appendPropertyChildren(container, definitionId, rootNode.id, 1, selectedNodeId);
+}
+
+function appendPropertyChildren(container, definitionId, parentId, depth, selectedNodeId) {
+  const children = (state.propertyChildren.get(parentId) || [])
+    .map(id => state.propertyMap.get(id))
+    .filter(node => node && node.definitionId === definitionId)
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const prefix = `${"-".repeat(Math.max(1, depth) * 2)}>`;
+  children.forEach(child => {
+    const option = document.createElement("option");
+    option.value = child.id;
+    option.textContent = `${prefix}${DemoFormat.formatIdLabel(child.label, child.id)}`;
+    if (selectedNodeId === child.id) {
+      option.selected = true;
+    }
+    container.appendChild(option);
+    appendPropertyChildren(container, definitionId, child.id, depth + 1, selectedNodeId);
+  });
+}
+
+function getDefinitionRootNode(definitionId) {
+  return state.propertyNodes.find(
+    node => node.definitionId === definitionId && node.parentId == null
+  );
+}
+
 function getSelectedPropertyIds() {
   if (!state.selectedPropertyId) {
     return [];
   }
-  const includeDescendants = document.getElementById("toggleDescendants").checked;
-  if (!includeDescendants) {
-    return [state.selectedPropertyId];
-  }
-  const descendants = collectDescendants(state.selectedPropertyId);
-  return [state.selectedPropertyId, ...descendants];
+  return [state.selectedPropertyId];
 }
 
 function collectDescendants(propertyId) {
@@ -783,7 +1345,11 @@ function filterResourcesByProperty(resources) {
   if (!state.selectedPropertyId || state.propertyIds.length === 0) {
     return resources;
   }
+  const includeDescendants = document.getElementById("toggleDescendants").checked;
   const allowed = new Set(state.propertyIds);
+  if (includeDescendants) {
+    collectDescendants(state.selectedPropertyId).forEach(id => allowed.add(id));
+  }
   return resources.filter(resource => {
     const props = resource.properties || [];
     return props.some(prop => allowed.has(prop.id));
@@ -802,7 +1368,7 @@ function appendPropertyTags(container, properties) {
         ? state.propertyMap.get(prop.parentId)
         : null;
     const prefix = definition ? `${definition.label}: ` : "";
-    const tag = createElement("span", "property-tag", `${prefix}${prop.label} (#${prop.id})`);
+    const tag = createElement("span", "property-tag", `${prefix}${DemoFormat.formatIdLabel(prop.label, prop.id)}`);
     container.appendChild(tag);
   });
   return true;
@@ -839,7 +1405,7 @@ function formatTimeRange(start, end) {
 
 function formatResourceNames(resourceIds) {
   if (!resourceIds || resourceIds.length === 0) return "Resources: n/a";
-  const names = resourceIds.map(id => state.resourceMap.get(id)?.name || `#${id}`);
+  const names = resourceIds.map(id => DemoFormat.formatResourceLabel(id, state.resourceMap));
   return `Resources: ${names.join(", ")}`;
 }
 
@@ -850,7 +1416,7 @@ function appendResourceTags(container, resourceIds) {
   }
   resourceIds.forEach(id => {
     const resource = state.resourceMap.get(id);
-    const name = resource?.name || `#${id}`;
+    const name = resource ? DemoFormat.formatIdLabel(resource.name, resource.id) : `#${id}`;
     const type = getResourceType(resource);
     const tag = createElement("span", `tag tag-${type}`, name);
     container.appendChild(tag);
@@ -913,7 +1479,7 @@ function applyRuleHighlight(rule) {
   }
 
   const count = countSlotsForRule(rule);
-  selectionInfoEl.textContent = `Rule #${rule.id} contributes to ${count} slot${count === 1 ? "" : "s"} in the selected range.`;
+  selectionInfoEl.textContent = `${DemoFormat.formatRuleLabel(rule)} contributes to ${count} slot${count === 1 ? "" : "s"} in the selected range.`;
   document.querySelectorAll(".rule-card").forEach(el => {
     el.classList.toggle("selected", Number(el.dataset.ruleId) === rule.id);
     el.classList.toggle("dimmed", Number(el.dataset.ruleId) !== rule.id);
@@ -1015,6 +1581,35 @@ function isWithinTimeRange(rule, start, end) {
   return slotStartMinutes >= ruleStart && slotEndMinutes <= ruleEnd;
 }
 
+function createTooltipIcon(kind) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.classList.add("tooltip-icon", kind);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  if (kind === "match") {
+    path.setAttribute("d", "M5 10l3 3 7-7");
+  } else if (kind === "none") {
+    path.setAttribute("d", "M6 10h8");
+  } else {
+    path.setAttribute("d", "M6 6l8 8M14 6l-8 8");
+  }
+  svg.appendChild(path);
+  return svg;
+}
+
+function appendTooltipLine(container, kind, text) {
+  const line = document.createElement("div");
+  line.className = "tooltip-item";
+  line.appendChild(createTooltipIcon(kind));
+  line.appendChild(document.createTextNode(text));
+  container.appendChild(line);
+}
+
 function showSlotTooltip(element, slot) {
   if (!document.getElementById("toggleExplain").checked) return;
   hideSlotTooltip(element);
@@ -1024,24 +1619,29 @@ function showSlotTooltip(element, slot) {
     overlapsUtc(slot.startUtc, slot.endUtc, busy.startUtc, busy.endUtc));
 
   const tooltip = createElement("div", "tooltip");
-  tooltip.appendChild(createElement("strong", null, "Slot analysis"));
-  tooltip.appendChild(createElement("div", null, "Rules (match):"));
+  tooltip.appendChild(createElement("div", "tooltip-title", "Slot analysis"));
+  tooltip.appendChild(createElement("div", "tooltip-section", "Rules matched"));
   if (rules.length === 0) {
-    tooltip.appendChild(createElement("div", null, "- [NONE] No matching rules"));
+    appendTooltipLine(tooltip, "none", "No matching rules");
   } else {
     rules.forEach(rule => {
-      tooltip.appendChild(createElement("div", null, `- [MATCH] Rule #${rule.id} - ${rule.title || "Untitled"}`));
+      appendTooltipLine(
+        tooltip,
+        "match",
+        `${DemoFormat.formatRuleLabel(rule)} - ${rule.title || "Untitled"}`
+      );
     });
   }
-  tooltip.appendChild(createElement("div", null, "Busy overlaps (block):"));
+  tooltip.appendChild(createElement("div", "tooltip-section", "Busy overlaps"));
   if (busyConflicts.length === 0) {
-    tooltip.appendChild(createElement("div", null, "- [NONE] No busy overlaps"));
+    appendTooltipLine(tooltip, "none", "No busy overlaps");
   } else {
     busyConflicts.forEach(busy => {
-      tooltip.appendChild(createElement(
-        "div",
-        null,
-        `- [BLOCK] Busy #${busy.id} - ${formatUtcTime(busy.startUtc)}-${formatUtcTime(busy.endUtc)}`));
+      appendTooltipLine(
+        tooltip,
+        "block",
+        `${DemoFormat.formatBusyLabel(busy)} - ${formatUtcTime(busy.startUtc)}-${formatUtcTime(busy.endUtc)}`
+      );
     });
   }
 
@@ -1075,6 +1675,7 @@ async function resetDemo() {
 async function loadAll() {
   weekLabelEl.textContent = formatRangeLabel(state.weekStart);
   renderQuerySummary();
+  buildAvailabilityPayload();
   setComputeStatus("Computing...");
   try {
     await Promise.all([loadAvailability(), loadDemoSummary()]);
@@ -1102,8 +1703,14 @@ async function init() {
 init();
 
 async function bootstrapAfterApiReady() {
-  await loadPropertyCatalog();
+  await Promise.all([loadPropertyCatalog(), loadResourceTypes()]);
   await loadResources();
+  renderAncestorFilterDefinitions();
+  renderAncestorFilterProperties();
+  renderAncestorFilterChips();
+  updateAncestorTypesVisibility();
+  updateAncestorTypesState();
+  updateSlotDurationVisibility();
   renderPropertyChips();
   await loadAll();
   setApiStatus("hidden", "");
@@ -1147,3 +1754,6 @@ function setApiStatus(stateName, message) {
   apiStatusEl.classList.add(stateName);
   apiStatusMessageEl.textContent = message;
 }
+
+
+

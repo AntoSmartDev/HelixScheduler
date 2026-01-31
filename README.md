@@ -61,6 +61,43 @@ Note: SQLite support is temporarily disabled.
 - `POST /api/demo/reset` (Development only)
 - `GET /api/resources`
 
+See `API_EXAMPLES.md` for ready-to-run requests.
+Primer: ancestorFilters support `matchMode` (or/and), `scope` (anyAncestor/directParent/nearestOfType), and `matchAllAncestors` for strict matching.
+
+Example: include resource ancestors (per-group mode by default)
+```json
+POST /api/availability/compute
+{
+  "fromDate": "2026-01-06",
+  "toDate": "2026-01-06",
+  "requiredResourceIds": [2,3],
+  "includeResourceAncestors": true,
+  "ancestorRelationTypes": ["Contains"],
+  "ancestorMode": "perGroup"
+}
+```
+Defaults:
+- If includeResourceAncestors is false, ancestorMode/ancestorRelationTypes are ignored.
+- If ancestorMode is omitted, it defaults to perGroup.
+- If ancestorRelationTypes is omitted or empty, all relation types are considered.
+
+Example: GET slots with ancestors
+```
+GET /api/availability/slots?fromDate=2026-01-06&toDate=2026-01-06&resourceIds=2,3&includeResourceAncestors=true&ancestorMode=perGroup&ancestorRelationTypes=Contains
+```
+
+Example: chunked slots (compute only)
+```json
+POST /api/availability/compute
+{
+  "fromDate": "2026-03-09",
+  "toDate": "2026-03-09",
+  "requiredResourceIds": [5,4],
+  "slotDurationMinutes": 60,
+  "includeRemainderSlot": false
+}
+```
+
 ## DemoWeb
 The read-only UI shows:
 - weekly availability calendar

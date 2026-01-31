@@ -7,7 +7,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Seed;
 
 public sealed class DemoSeedService : IDemoSeedService
 {
-    private const int SeedVersion = 3;
+    private const int SeedVersion = 6;
     private readonly SchedulerDbContext _dbContext;
     private readonly IDemoScenarioStore _store;
     private readonly IClock _clock;
@@ -47,48 +47,156 @@ public sealed class DemoSeedService : IDemoSeedService
         await CleanupDemoPropertyTreeAsync(ct).ConfigureAwait(false);
         await CleanupDemoPropertyLinksAsync(ct).ConfigureAwait(false);
         await CleanupDemoTypeMappingsAsync(ct).ConfigureAwait(false);
+        await CleanupDemoRelationsAsync(ct).ConfigureAwait(false);
 
         var siteType = await EnsureResourceTypeAsync("Site", "Site", 1, ct);
-        var roomType = await EnsureResourceTypeAsync("Room", "Room", 2, ct);
-        var doctorType = await EnsureResourceTypeAsync("Doctor", "Doctor", 3, ct);
+        var floorType = await EnsureResourceTypeAsync("Floor", "Floor", 2, ct);
+        var roomType = await EnsureResourceTypeAsync("Room", "Room", 3, ct);
+        var doctorType = await EnsureResourceTypeAsync("Doctor", "Doctor", 4, ct);
 
-        var site = await EnsureResourceAsync("SITE-A", "Site A", capacity: 0, isSchedulable: false, siteType.Id, nowUtc, ct);
+        var siteA = await EnsureResourceAsync("SITE-A", "Site A", capacity: 1, isSchedulable: false, siteType.Id, nowUtc, ct);
+        var siteB = await EnsureResourceAsync("SITE-B", "Site B", capacity: 1, isSchedulable: false, siteType.Id, nowUtc, ct);
+        var floorA1 = await EnsureResourceAsync("FLOOR-A1", "Floor A1", capacity: 1, isSchedulable: false, floorType.Id, nowUtc, ct);
+        var floorB1 = await EnsureResourceAsync("FLOOR-B1", "Floor B1", capacity: 1, isSchedulable: false, floorType.Id, nowUtc, ct);
         var room1 = await EnsureResourceAsync("ROOM-1", "Room 1", capacity: 1, isSchedulable: true, roomType.Id, nowUtc, ct);
-        var room2 = await EnsureResourceAsync("ROOM-2", "Room 2", capacity: 1, isSchedulable: true, roomType.Id, nowUtc, ct);
+        var room2 = await EnsureResourceAsync("ROOM-2", "Room 2", capacity: 2, isSchedulable: true, roomType.Id, nowUtc, ct);
         var room3 = await EnsureResourceAsync("ROOM-3", "Room 3", capacity: 1, isSchedulable: true, roomType.Id, nowUtc, ct);
+        var room4 = await EnsureResourceAsync("ROOM-4", "Room 4", capacity: 1, isSchedulable: true, roomType.Id, nowUtc, ct);
         var doctor7 = await EnsureResourceAsync("DOC-7", "Doctor 7", capacity: 1, isSchedulable: true, doctorType.Id, nowUtc, ct);
         var doctor8 = await EnsureResourceAsync("DOC-8", "Doctor 8", capacity: 1, isSchedulable: true, doctorType.Id, nowUtc, ct);
+        var doctor9 = await EnsureResourceAsync("DOC-9", "Doctor 9", capacity: 1, isSchedulable: true, doctorType.Id, nowUtc, ct);
 
-        await EnsureRelationAsync(site.Id, room1.Id, "Contains", ct);
-        await EnsureRelationAsync(site.Id, room2.Id, "Contains", ct);
-        await EnsureRelationAsync(site.Id, room3.Id, "Contains", ct);
-        await EnsureRelationAsync(site.Id, doctor7.Id, "WorksIn", ct);
-        await EnsureRelationAsync(site.Id, doctor8.Id, "WorksIn", ct);
+        await EnsureRelationAsync(siteA.Id, floorA1.Id, "Contains", ct);
+        await EnsureRelationAsync(floorA1.Id, room1.Id, "Contains", ct);
+        await EnsureRelationAsync(floorA1.Id, room2.Id, "Contains", ct);
+        await EnsureRelationAsync(siteA.Id, room3.Id, "Contains", ct);
+        await EnsureRelationAsync(siteB.Id, floorB1.Id, "Contains", ct);
+        await EnsureRelationAsync(floorB1.Id, room4.Id, "Contains", ct);
+        await EnsureRelationAsync(siteA.Id, doctor7.Id, "WorksIn", ct);
+        await EnsureRelationAsync(siteA.Id, doctor8.Id, "WorksIn", ct);
+        await EnsureRelationAsync(siteB.Id, doctor9.Id, "WorksIn", ct);
 
         var specializationRoot = await EnsurePropertyAsync("Specialization", "Specialization", null, null, ct);
         var roomFeatureRoot = await EnsurePropertyAsync("RoomFeature", "RoomFeature", null, null, ct);
+        var locationRoot = await EnsurePropertyAsync("Location", "Location", null, null, ct);
+        var accreditationRoot = await EnsurePropertyAsync("Accreditation", "Accreditation", null, null, ct);
+
         var ophthalmology = await EnsurePropertyAsync("Specialization", "Ophthalmology", specializationRoot.Id, 1, ct);
+        var retina = await EnsurePropertyAsync("Specialization", "Retina", ophthalmology.Id, 1, ct);
         var cardiology = await EnsurePropertyAsync("Specialization", "Cardiology", specializationRoot.Id, 2, ct);
-        var oct = await EnsurePropertyAsync("RoomFeature", "OCT", roomFeatureRoot.Id, 1, ct);
+        var interventionalCardiology = await EnsurePropertyAsync(
+            "Specialization",
+            "Interventional Cardiology",
+            cardiology.Id,
+            1,
+            ct);
+        var imaging = await EnsurePropertyAsync("RoomFeature", "Imaging", roomFeatureRoot.Id, 1, ct);
+        var oct = await EnsurePropertyAsync("RoomFeature", "OCT", imaging.Id, 1, ct);
+        var mri = await EnsurePropertyAsync("RoomFeature", "MRI", imaging.Id, 2, ct);
+        var ultrasound = await EnsurePropertyAsync("RoomFeature", "Ultrasound", imaging.Id, 3, ct);
+        var milan = await EnsurePropertyAsync("Location", "Milan", locationRoot.Id, 1, ct);
+        var rome = await EnsurePropertyAsync("Location", "Rome", locationRoot.Id, 2, ct);
+        var iso9001 = await EnsurePropertyAsync("Accreditation", "ISO 9001", accreditationRoot.Id, 1, ct);
+        var soc2 = await EnsurePropertyAsync("Accreditation", "SOC2", accreditationRoot.Id, 2, ct);
 
         await EnsureResourceTypePropertyAsync(doctorType.Id, specializationRoot.Id, ct);
         await EnsureResourceTypePropertyAsync(roomType.Id, roomFeatureRoot.Id, ct);
+        await EnsureResourceTypePropertyAsync(siteType.Id, locationRoot.Id, ct);
+        await EnsureResourceTypePropertyAsync(siteType.Id, accreditationRoot.Id, ct);
 
-        await EnsurePropertyLinkAsync(doctor7.Id, ophthalmology.Id, ct);
+        await EnsurePropertyLinkAsync(doctor7.Id, retina.Id, ct);
         await EnsurePropertyLinkAsync(doctor8.Id, cardiology.Id, ct);
+        await EnsurePropertyLinkAsync(doctor9.Id, interventionalCardiology.Id, ct);
         await EnsurePropertyLinkAsync(room1.Id, oct.Id, ct);
+        await EnsurePropertyLinkAsync(room2.Id, mri.Id, ct);
+        await EnsurePropertyLinkAsync(room3.Id, ultrasound.Id, ct);
+        await EnsurePropertyLinkAsync(room4.Id, oct.Id, ct);
+        await EnsurePropertyLinkAsync(siteA.Id, milan.Id, ct);
+        await EnsurePropertyLinkAsync(siteA.Id, iso9001.Id, ct);
+        await EnsurePropertyLinkAsync(siteA.Id, soc2.Id, ct);
+        await EnsurePropertyLinkAsync(siteB.Id, rome.Id, ct);
+        await EnsurePropertyLinkAsync(siteB.Id, iso9001.Id, ct);
 
-        var periodEnd = baseDateUtc.AddDays(28);
-        var mondayWednesday = (1 << (int)DayOfWeek.Monday) | (1 << (int)DayOfWeek.Wednesday);
-        var tuesdayThursday = (1 << (int)DayOfWeek.Tuesday) | (1 << (int)DayOfWeek.Thursday);
+        var mondayWednesday = BuildDaysMask(DayOfWeek.Monday, DayOfWeek.Wednesday);
+        var tuesdayThursday = BuildDaysMask(DayOfWeek.Tuesday, DayOfWeek.Thursday);
+        var fridayOnly = BuildDaysMask(DayOfWeek.Friday);
+        var allWeek = BuildDaysMask(
+            DayOfWeek.Sunday,
+            DayOfWeek.Monday,
+            DayOfWeek.Tuesday,
+            DayOfWeek.Wednesday,
+            DayOfWeek.Thursday,
+            DayOfWeek.Friday,
+            DayOfWeek.Saturday);
+
+        var siteAOpen = await EnsureWeeklyRuleAsync(
+            "Demo: Site A open hours",
+            new TimeOnly(8, 0),
+            new TimeOnly(20, 0),
+            allWeek,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(siteAOpen.Id, siteA.Id, ct);
+
+        var floorAOpen = await EnsureWeeklyRuleAsync(
+            "Demo: Floor A1 open hours",
+            new TimeOnly(8, 0),
+            new TimeOnly(20, 0),
+            allWeek,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(floorAOpen.Id, floorA1.Id, ct);
+
+        var siteBOpen = await EnsureWeeklyRuleAsync(
+            "Demo: Site B open hours",
+            new TimeOnly(9, 0),
+            new TimeOnly(17, 0),
+            allWeek,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(siteBOpen.Id, siteB.Id, ct);
+
+        var floorBOpen = await EnsureWeeklyRuleAsync(
+            "Demo: Floor B1 open hours",
+            new TimeOnly(9, 0),
+            new TimeOnly(17, 0),
+            allWeek,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(floorBOpen.Id, floorB1.Id, ct);
+
+        var siteAExclude = await EnsureWeeklyRuleAsync(
+            "Demo: Site A maintenance",
+            new TimeOnly(15, 0),
+            new TimeOnly(16, 0),
+            BuildDaysMask(DayOfWeek.Wednesday),
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: true,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(siteAExclude.Id, siteA.Id, ct);
 
         var room1Rule = await EnsureWeeklyRuleAsync(
             "Demo: Room 1 availability",
             new TimeOnly(14, 0),
             new TimeOnly(18, 0),
             mondayWednesday,
-            baseDateUtc,
-            periodEnd,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(room1Rule.Id, room1.Id, ct);
@@ -98,8 +206,9 @@ public sealed class DemoSeedService : IDemoSeedService
             new TimeOnly(14, 0),
             new TimeOnly(18, 0),
             mondayWednesday,
-            baseDateUtc,
-            periodEnd,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(doctor7Rule.Id, doctor7.Id, ct);
@@ -109,8 +218,9 @@ public sealed class DemoSeedService : IDemoSeedService
             new TimeOnly(9, 0),
             new TimeOnly(13, 0),
             tuesdayThursday,
-            baseDateUtc,
-            periodEnd,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(room2Rule.Id, room2.Id, ct);
@@ -120,30 +230,77 @@ public sealed class DemoSeedService : IDemoSeedService
             new TimeOnly(9, 0),
             new TimeOnly(13, 0),
             tuesdayThursday,
-            baseDateUtc,
-            periodEnd,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(doctor8Rule.Id, doctor8.Id, ct);
 
-        var room3Rule = await EnsureWeeklyRuleAsync(
-            "Demo: Room 3 availability",
+        var doctor9Rule = await EnsureWeeklyRuleAsync(
+            "Demo: Doctor 9 availability",
             new TimeOnly(9, 0),
-            new TimeOnly(12, 0),
-            (1 << (int)DayOfWeek.Friday),
-            baseDateUtc,
-            periodEnd,
+            new TimeOnly(13, 0),
+            tuesdayThursday,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(doctor9Rule.Id, doctor9.Id, ct);
+
+        var room3Rule = await EnsureWeeklyRuleAsync(
+            "Demo: Room 3 short session",
+            new TimeOnly(9, 0),
+            new TimeOnly(10, 20),
+            fridayOnly,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
             nowUtc,
             ct);
         await EnsureRuleResourceAsync(room3Rule.Id, room3.Id, ct);
 
-        var busyDoctor = await EnsureBusyEventAsync(
+        var room4Rule = await EnsureWeeklyRuleAsync(
+            "Demo: Room 4 availability",
+            new TimeOnly(10, 0),
+            new TimeOnly(15, 0),
+            mondayWednesday,
+            fromDateUtc: null,
+            toDateUtc: null,
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(room4Rule.Id, room4.Id, ct);
+
+        var room2Single = await EnsureSingleDateRuleAsync(
+            "Demo: Room 2 single date",
+            new TimeOnly(12, 0),
+            new TimeOnly(14, 0),
+            baseDateUtc.AddDays(1),
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(room2Single.Id, room2.Id, ct);
+
+        var doctor7Range = await EnsureRangeRuleAsync(
+            "Demo: Doctor 7 range availability",
+            new TimeOnly(12, 0),
+            new TimeOnly(14, 0),
+            baseDateUtc.AddDays(7),
+            baseDateUtc.AddDays(10),
+            isExclude: false,
+            nowUtc,
+            ct);
+        await EnsureRuleResourceAsync(doctor7Range.Id, doctor7.Id, ct);
+
+        var busyDoctor7 = await EnsureBusyEventAsync(
             "Demo: Doctor 7 busy",
             ToUtc(baseDateUtc, new TimeOnly(15, 0)),
             ToUtc(baseDateUtc, new TimeOnly(16, 0)),
             nowUtc,
             ct);
-        await EnsureBusyEventResourceAsync(busyDoctor.Id, doctor7.Id, ct);
+        await EnsureBusyEventResourceAsync(busyDoctor7.Id, doctor7.Id, ct);
 
         var busyDoctorRoom = await EnsureBusyEventAsync(
             "Demo: Doctor 7 + Room 1 busy",
@@ -170,6 +327,30 @@ public sealed class DemoSeedService : IDemoSeedService
             ct);
         await EnsureBusyEventResourceAsync(busyDoctor8.Id, doctor8.Id, ct);
 
+        var busySiteA = await EnsureBusyEventAsync(
+            "Demo: Site A busy",
+            ToUtc(baseDateUtc.AddDays(1), new TimeOnly(10, 0)),
+            ToUtc(baseDateUtc.AddDays(1), new TimeOnly(11, 0)),
+            nowUtc,
+            ct);
+        await EnsureBusyEventResourceAsync(busySiteA.Id, siteA.Id, ct);
+
+        var busyFloorA = await EnsureBusyEventAsync(
+            "Demo: Floor A1 busy",
+            ToUtc(baseDateUtc.AddDays(1), new TimeOnly(11, 0)),
+            ToUtc(baseDateUtc.AddDays(1), new TimeOnly(12, 0)),
+            nowUtc,
+            ct);
+        await EnsureBusyEventResourceAsync(busyFloorA.Id, floorA1.Id, ct);
+
+        var busyRoom3 = await EnsureBusyEventAsync(
+            "Demo: Room 3 busy",
+            ToUtc(baseDateUtc.AddDays(4), new TimeOnly(9, 40)),
+            ToUtc(baseDateUtc.AddDays(4), new TimeOnly(10, 0)),
+            nowUtc,
+            ct);
+        await EnsureBusyEventResourceAsync(busyRoom3.Id, room3.Id, ct);
+
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
         var state = new DemoScenarioState(baseDateUtc, SeedVersion, nowUtc);
@@ -186,6 +367,17 @@ public sealed class DemoSeedService : IDemoSeedService
     private static DateTime ToUtc(DateOnly date, TimeOnly time)
     {
         return DateTime.SpecifyKind(date.ToDateTime(time), DateTimeKind.Utc);
+    }
+
+    private static int BuildDaysMask(params DayOfWeek[] days)
+    {
+        var mask = 0;
+        for (var i = 0; i < days.Length; i++)
+        {
+            mask |= 1 << (int)days[i];
+        }
+
+        return mask;
     }
 
     private async Task<Resources> EnsureResourceAsync(
@@ -347,8 +539,9 @@ public sealed class DemoSeedService : IDemoSeedService
         TimeOnly startTime,
         TimeOnly endTime,
         int daysOfWeekMask,
-        DateOnly fromDateUtc,
-        DateOnly toDateUtc,
+        DateOnly? fromDateUtc,
+        DateOnly? toDateUtc,
+        bool isExclude,
         DateTime nowUtc,
         CancellationToken ct)
     {
@@ -358,7 +551,7 @@ public sealed class DemoSeedService : IDemoSeedService
         if (rule != null)
         {
             rule.Kind = 1;
-            rule.IsExclude = false;
+            rule.IsExclude = isExclude;
             rule.StartTime = startTime;
             rule.EndTime = endTime;
             rule.DaysOfWeekMask = daysOfWeekMask;
@@ -371,13 +564,102 @@ public sealed class DemoSeedService : IDemoSeedService
         rule = new Rules
         {
             Kind = 1,
-            IsExclude = false,
+            IsExclude = isExclude,
             Title = title,
             StartTime = startTime,
             EndTime = endTime,
             DaysOfWeekMask = daysOfWeekMask,
             FromDateUtc = fromDateUtc,
             ToDateUtc = toDateUtc,
+            CreatedAtUtc = nowUtc
+        };
+
+        _dbContext.Rules.Add(rule);
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        return rule;
+    }
+
+    private async Task<Rules> EnsureSingleDateRuleAsync(
+        string title,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        DateOnly singleDateUtc,
+        bool isExclude,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        var rule = await _dbContext.Rules.FirstOrDefaultAsync(item => item.Title == title, ct)
+            .ConfigureAwait(false);
+
+        if (rule != null)
+        {
+            rule.Kind = 2;
+            rule.IsExclude = isExclude;
+            rule.StartTime = startTime;
+            rule.EndTime = endTime;
+            rule.DaysOfWeekMask = null;
+            rule.FromDateUtc = null;
+            rule.ToDateUtc = null;
+            rule.SingleDateUtc = singleDateUtc;
+            return rule;
+        }
+
+        rule = new Rules
+        {
+            Kind = 2,
+            IsExclude = isExclude,
+            Title = title,
+            StartTime = startTime,
+            EndTime = endTime,
+            DaysOfWeekMask = null,
+            FromDateUtc = null,
+            ToDateUtc = null,
+            SingleDateUtc = singleDateUtc,
+            CreatedAtUtc = nowUtc
+        };
+
+        _dbContext.Rules.Add(rule);
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        return rule;
+    }
+
+    private async Task<Rules> EnsureRangeRuleAsync(
+        string title,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        DateOnly fromDateUtc,
+        DateOnly toDateUtc,
+        bool isExclude,
+        DateTime nowUtc,
+        CancellationToken ct)
+    {
+        var rule = await _dbContext.Rules.FirstOrDefaultAsync(item => item.Title == title, ct)
+            .ConfigureAwait(false);
+
+        if (rule != null)
+        {
+            rule.Kind = 3;
+            rule.IsExclude = isExclude;
+            rule.StartTime = startTime;
+            rule.EndTime = endTime;
+            rule.DaysOfWeekMask = null;
+            rule.FromDateUtc = fromDateUtc;
+            rule.ToDateUtc = toDateUtc;
+            rule.SingleDateUtc = null;
+            return rule;
+        }
+
+        rule = new Rules
+        {
+            Kind = 3,
+            IsExclude = isExclude,
+            Title = title,
+            StartTime = startTime,
+            EndTime = endTime,
+            DaysOfWeekMask = null,
+            FromDateUtc = fromDateUtc,
+            ToDateUtc = toDateUtc,
+            SingleDateUtc = null,
             CreatedAtUtc = nowUtc
         };
 
@@ -476,22 +758,22 @@ public sealed class DemoSeedService : IDemoSeedService
             DELETE rpl
             FROM ResourcePropertyLinks rpl
             INNER JOIN ResourceProperties p ON rpl.PropertyId = p.Id
-            WHERE p.[Key] IN ('Specialization', 'RoomFeature')
+            WHERE p.[Key] IN ('Specialization', 'RoomFeature', 'Location', 'Accreditation')
                OR EXISTS (
                     SELECT 1
                     FROM ResourceProperties parent
                     WHERE parent.Id = p.ParentId
-                      AND parent.[Key] IN ('Specialization', 'RoomFeature')
+                      AND parent.[Key] IN ('Specialization', 'RoomFeature', 'Location', 'Accreditation')
                );
 
             DELETE p
             FROM ResourceProperties p
-            WHERE p.[Key] IN ('Specialization', 'RoomFeature')
+            WHERE p.[Key] IN ('Specialization', 'RoomFeature', 'Location', 'Accreditation')
                OR EXISTS (
                     SELECT 1
                     FROM ResourceProperties parent
                     WHERE parent.Id = p.ParentId
-                      AND parent.[Key] IN ('Specialization', 'RoomFeature')
+                      AND parent.[Key] IN ('Specialization', 'RoomFeature', 'Location', 'Accreditation')
                );
             """,
             ct);
@@ -504,7 +786,7 @@ public sealed class DemoSeedService : IDemoSeedService
             DELETE rtp
             FROM ResourceTypeProperties rtp
             INNER JOIN ResourceTypes rt ON rtp.ResourceTypeId = rt.Id
-            WHERE rt.[Key] IN ('Doctor', 'Room');
+            WHERE rt.[Key] IN ('Doctor', 'Room', 'Site', 'Floor');
             """,
             ct);
     }
@@ -516,8 +798,27 @@ public sealed class DemoSeedService : IDemoSeedService
             DELETE rpl
             FROM ResourcePropertyLinks rpl
             INNER JOIN Resources r ON rpl.ResourceId = r.Id
-            WHERE r.Code IN ('SITE-A', 'ROOM-1', 'ROOM-2', 'ROOM-3', 'DOC-7', 'DOC-8')
-               OR r.Name IN ('Site A', 'Room 1', 'Room 2', 'Room 3', 'Doctor 7', 'Doctor 8');
+            WHERE r.Code IN ('SITE-A', 'SITE-B', 'FLOOR-A1', 'FLOOR-B1', 'ROOM-1', 'ROOM-2', 'ROOM-3', 'ROOM-4', 'DOC-7', 'DOC-8', 'DOC-9')
+               OR r.Name IN ('Site A', 'Site B', 'Floor A1', 'Floor B1', 'Room 1', 'Room 2', 'Room 3', 'Room 4', 'Doctor 7', 'Doctor 8', 'Doctor 9');
+            """,
+            ct);
+    }
+
+    private Task CleanupDemoRelationsAsync(CancellationToken ct)
+    {
+        return _dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DELETE FROM ResourceRelations
+            WHERE ParentResourceId IN (
+                SELECT Id FROM Resources
+                WHERE Code IN ('SITE-A', 'SITE-B', 'FLOOR-A1', 'FLOOR-B1', 'ROOM-1', 'ROOM-2', 'ROOM-3', 'ROOM-4', 'DOC-7', 'DOC-8', 'DOC-9')
+                   OR Name IN ('Site A', 'Site B', 'Floor A1', 'Floor B1', 'Room 1', 'Room 2', 'Room 3', 'Room 4', 'Doctor 7', 'Doctor 8', 'Doctor 9')
+            )
+            OR ChildResourceId IN (
+                SELECT Id FROM Resources
+                WHERE Code IN ('SITE-A', 'SITE-B', 'FLOOR-A1', 'FLOOR-B1', 'ROOM-1', 'ROOM-2', 'ROOM-3', 'ROOM-4', 'DOC-7', 'DOC-8', 'DOC-9')
+                   OR Name IN ('Site A', 'Site B', 'Floor A1', 'Floor B1', 'Room 1', 'Room 2', 'Room 3', 'Room 4', 'Doctor 7', 'Doctor 8', 'Doctor 9')
+            );
             """,
             ct);
     }
