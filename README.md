@@ -32,11 +32,11 @@ ConnectionStrings__SchedulerDb=Server=.\SQLEXPRESS;Database=HelixScheduler;Trust
 ```
 Start the API:
 ```
-dotnet run --project HelixScheduler
+dotnet run --project src/HelixScheduler.WebApi
 ```
 Start the demo UI:
 ```
-dotnet run --project HelixScheduler.DemoWeb
+dotnet run --project samples/HelixScheduler.DemoWeb
 ```
 Open the demo:
 ```
@@ -59,7 +59,7 @@ Note: SQLite support is temporarily disabled.
 - `GET /api/availability/slots` (legacy querystring)
 - `POST /api/demo/summary` (rules + busy slots for demo UI)
 - `POST /api/demo/reset` (Development only)
-- `GET /api/resources`
+- `GET /api/catalog/resources`
 
 See `API_EXAMPLES.md` for ready-to-run requests.
 Primer: ancestorFilters support `matchMode` (or/and), `scope` (anyAncestor/directParent/nearestOfType), and `matchAllAncestors` for strict matching.
