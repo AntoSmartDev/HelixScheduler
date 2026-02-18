@@ -10,6 +10,11 @@ public sealed class ResourceTypesConfiguration : IEntityTypeConfiguration<Resour
     {
         builder.ToTable("ResourceTypes");
         builder.HasKey(type => type.Id);
+        builder.HasAlternateKey(type => new { type.TenantId, type.Id });
+
+        builder.Property(type => type.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.Property(type => type.Key)
             .HasMaxLength(100)
@@ -21,6 +26,12 @@ public sealed class ResourceTypesConfiguration : IEntityTypeConfiguration<Resour
 
         builder.Property(type => type.SortOrder);
 
-        builder.HasIndex(type => type.Key);
+        builder.HasOne<Tenants>()
+            .WithMany()
+            .HasForeignKey(type => type.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(type => new { type.TenantId, type.Key })
+            .IsUnique();
     }
 }

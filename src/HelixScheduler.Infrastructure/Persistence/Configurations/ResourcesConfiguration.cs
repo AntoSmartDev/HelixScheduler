@@ -10,9 +10,14 @@ public sealed class ResourcesConfiguration : IEntityTypeConfiguration<Resources>
     {
         builder.ToTable("Resources", table => table.HasCheckConstraint("CK_Resources_Capacity", "[Capacity] >= 1"));
         builder.HasKey(resource => resource.Id);
+        builder.HasAlternateKey(resource => new { resource.TenantId, resource.Id });
 
         builder.Property(resource => resource.Id)
             .ValueGeneratedOnAdd();
+
+        builder.Property(resource => resource.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.Property(resource => resource.Code)
             .HasMaxLength(64);
@@ -35,13 +40,20 @@ public sealed class ResourcesConfiguration : IEntityTypeConfiguration<Resources>
             .HasColumnType("datetime2")
             .IsRequired();
 
+        builder.HasOne<Tenants>()
+            .WithMany()
+            .HasForeignKey(resource => resource.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(resource => resource.Type)
             .WithMany(type => type.Resources)
-            .HasForeignKey(resource => resource.TypeId)
+            .HasForeignKey(resource => new { resource.TenantId, resource.TypeId })
+            .HasPrincipalKey(type => new { type.TenantId, type.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(resource => resource.Code);
-        builder.HasIndex(resource => resource.IsSchedulable);
-        builder.HasIndex(resource => resource.TypeId);
+        builder.HasIndex(resource => new { resource.TenantId, resource.Code });
+        builder.HasIndex(resource => new { resource.TenantId, resource.IsSchedulable });
+        builder.HasIndex(resource => new { resource.TenantId, resource.TypeId });
     }
 }

@@ -2,6 +2,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Entities;
 
 public sealed class ResourceTypeProperties
 {
+    public Guid TenantId { get; set; }
     public int ResourceTypeId { get; set; }
     public int PropertyDefinitionId { get; set; }
 

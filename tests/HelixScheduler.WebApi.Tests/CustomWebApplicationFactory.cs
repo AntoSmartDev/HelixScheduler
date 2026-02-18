@@ -1,3 +1,5 @@
+using HelixScheduler.Application.Abstractions;
+using HelixScheduler.Application.Availability;
 using HelixScheduler.Infrastructure.Persistence.Repositories;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Hosting;
@@ -18,11 +20,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<IBusyEventRepository>();
             services.RemoveAll<IPropertyRepository>();
             services.RemoveAll<IResourceRepository>();
+            services.RemoveAll<ITenantStore>();
+            services.RemoveAll<IAvailabilityDataSource>();
 
             services.AddSingleton<IRuleRepository, FakeRuleRepository>();
             services.AddSingleton<IBusyEventRepository, FakeBusyEventRepository>();
             services.AddSingleton<IPropertyRepository, FakePropertyRepository>();
             services.AddSingleton<IResourceRepository, FakeResourceRepository>();
+            services.AddSingleton<ITenantStore, FakeTenantStore>();
+            services.AddSingleton<IAvailabilityDataSource, FakeAvailabilityDataSource>();
         });
     }
 
@@ -208,6 +214,195 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             }
 
             return Task.FromResult<IReadOnlyDictionary<int, int>>(result);
+        }
+    }
+
+    private sealed class FakeTenantStore : ITenantStore
+    {
+        private static readonly TenantInfo DefaultTenant = new(
+            new Guid("11111111-1111-1111-1111-111111111111"),
+            "default",
+            "Default");
+
+        public Task<TenantInfo?> FindByKeyAsync(string key, CancellationToken ct)
+        {
+            if (string.Equals(key, DefaultTenant.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<TenantInfo?>(DefaultTenant);
+            }
+
+            return Task.FromResult<TenantInfo?>(null);
+        }
+
+        public Task<TenantInfo> EnsureDefaultAsync(CancellationToken ct)
+        {
+            return Task.FromResult(DefaultTenant);
+        }
+    }
+
+    private sealed class FakeAvailabilityDataSource : IAvailabilityDataSource
+    {
+        private readonly IRuleRepository _ruleRepository;
+        private readonly IBusyEventRepository _busyEventRepository;
+        private readonly IPropertyRepository _propertyRepository;
+        private readonly IResourceRepository _resourceRepository;
+
+        public FakeAvailabilityDataSource(
+            IRuleRepository ruleRepository,
+            IBusyEventRepository busyEventRepository,
+            IPropertyRepository propertyRepository,
+            IResourceRepository resourceRepository)
+        {
+            _ruleRepository = ruleRepository;
+            _busyEventRepository = busyEventRepository;
+            _propertyRepository = propertyRepository;
+            _resourceRepository = resourceRepository;
+        }
+
+        public async Task<IReadOnlyList<RuleData>> GetRulesAsync(
+            DateOnly fromDateUtc,
+            DateOnly toDateUtc,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var rules = await _ruleRepository
+                .GetRulesAsync(fromDateUtc, toDateUtc, resourceIds, ct)
+                .ConfigureAwait(false);
+
+            return rules
+                .Select(rule => new RuleData(
+                    rule.Id,
+                    rule.Kind,
+                    rule.IsExclude,
+                    rule.FromDateUtc,
+                    rule.ToDateUtc,
+                    rule.SingleDateUtc,
+                    rule.StartTime,
+                    rule.EndTime,
+                    rule.DaysOfWeekMask,
+                    rule.DayOfMonth,
+                    rule.IntervalDays,
+                    rule.ResourceIds))
+                .ToList();
+        }
+
+        public Task<IReadOnlyDictionary<int, int>> GetResourceCapacitiesAsync(
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            return _resourceRepository.GetCapacitiesAsync(resourceIds, ct);
+        }
+
+        public async Task<IReadOnlyList<BusyEventData>> GetBusyEventsAsync(
+            DateTime fromUtc,
+            DateTime toUtcExclusive,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var busyEvents = await _busyEventRepository
+                .GetBusyAsync(fromUtc, toUtcExclusive, resourceIds, ct)
+                .ConfigureAwait(false);
+
+            return busyEvents
+                .Select(busy => new BusyEventData(
+                    busy.Id,
+                    busy.StartUtc,
+                    busy.EndUtc,
+                    busy.ResourceIds))
+                .ToList();
+        }
+
+        public async Task<IReadOnlyList<PropertyNode>> ExpandPropertySubtreeAsync(
+            int propertyId,
+            CancellationToken ct)
+        {
+            var properties = await _propertyRepository
+                .ExpandPropertySubtreeAsync(propertyId, ct)
+                .ConfigureAwait(false);
+
+            return properties
+                .Select(property => new PropertyNode(
+                    property.Id,
+                    property.ParentId,
+                    property.Key,
+                    property.Label,
+                    property.SortOrder))
+                .ToList();
+        }
+
+        public Task<IReadOnlyList<int>> GetResourceIdsByPropertiesAsync(
+            IReadOnlyList<int> propertyIds,
+            CancellationToken ct)
+        {
+            return _propertyRepository.GetResourceIdsByPropertiesAsync(propertyIds, ct);
+        }
+
+        public Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
+            IReadOnlyList<int> propertyIds,
+            CancellationToken ct)
+        {
+            return _propertyRepository.GetResourceIdsByAllPropertiesAsync(propertyIds, ct);
+        }
+
+        public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(
+            bool onlySchedulable,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());
+        }
+
+        public async Task<IReadOnlyList<RuleSummary>> GetRuleSummariesAsync(
+            DateOnly fromDateUtc,
+            DateOnly toDateUtc,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var rules = await _ruleRepository
+                .GetRulesAsync(fromDateUtc, toDateUtc, resourceIds, ct)
+                .ConfigureAwait(false);
+
+            return rules
+                .Select(rule => new RuleSummary(
+                    rule.Id,
+                    rule.Title,
+                    rule.Kind,
+                    rule.IsExclude,
+                    rule.FromDateUtc,
+                    rule.ToDateUtc,
+                    rule.SingleDateUtc,
+                    rule.StartTime,
+                    rule.EndTime,
+                    rule.DaysOfWeekMask,
+                    rule.ResourceIds))
+                .ToList();
+        }
+
+        public async Task<IReadOnlyList<BusyEventSummary>> GetBusyEventSummariesAsync(
+            DateTime fromUtc,
+            DateTime toUtcExclusive,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var busyEvents = await _busyEventRepository
+                .GetBusyAsync(fromUtc, toUtcExclusive, resourceIds, ct)
+                .ConfigureAwait(false);
+
+            return busyEvents
+                .Select(busy => new BusyEventSummary(
+                    busy.Id,
+                    busy.Title,
+                    busy.StartUtc,
+                    busy.EndUtc,
+                    busy.ResourceIds))
+                .ToList();
+        }
+
+        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
+            IReadOnlyList<int> childResourceIds,
+            IReadOnlyList<string>? relationTypes,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(Array.Empty<ResourceRelationLink>());
         }
     }
 }

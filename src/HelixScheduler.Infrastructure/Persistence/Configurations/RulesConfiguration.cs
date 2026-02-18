@@ -10,9 +10,14 @@ public sealed class RulesConfiguration : IEntityTypeConfiguration<Rules>
     {
         builder.ToTable("Rules");
         builder.HasKey(rule => rule.Id);
+        builder.HasAlternateKey(rule => new { rule.TenantId, rule.Id });
 
         builder.Property(rule => rule.Id)
             .ValueGeneratedOnAdd();
+
+        builder.Property(rule => rule.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.Property(rule => rule.Kind)
             .HasColumnType("tinyint")
@@ -42,7 +47,12 @@ public sealed class RulesConfiguration : IEntityTypeConfiguration<Rules>
             .HasColumnType("datetime2")
             .IsRequired();
 
-        builder.HasIndex(rule => new { rule.FromDateUtc, rule.ToDateUtc, rule.SingleDateUtc })
+        builder.HasOne<Tenants>()
+            .WithMany()
+            .HasForeignKey(rule => rule.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(rule => new { rule.TenantId, rule.FromDateUtc, rule.ToDateUtc, rule.SingleDateUtc })
             .IncludeProperties(rule => rule.IsExclude);
     }
 }

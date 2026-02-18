@@ -1,3 +1,4 @@
+using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,12 @@ namespace HelixScheduler.Infrastructure.Persistence.Repositories;
 public sealed class DemoScenarioStore : IDemoScenarioStore
 {
     private readonly SchedulerDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
 
-    public DemoScenarioStore(SchedulerDbContext dbContext)
+    public DemoScenarioStore(SchedulerDbContext dbContext, ITenantContext tenantContext)
     {
         _dbContext = dbContext;
+        _tenantContext = tenantContext;
     }
 
     public async Task<DemoScenarioState?> GetAsync(CancellationToken ct)
@@ -45,6 +48,7 @@ public sealed class DemoScenarioStore : IDemoScenarioStore
             _dbContext.DemoScenarioStates.Add(entity);
         }
 
+        entity.TenantId = _tenantContext.TenantId;
         entity.BaseDateUtc = DateTime.SpecifyKind(state.BaseDateUtc.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         entity.SeedVersion = state.SeedVersion;
         entity.UpdatedAtUtc = state.UpdatedAtUtc;

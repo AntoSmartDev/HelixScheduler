@@ -1,5 +1,6 @@
 ﻿using HelixScheduler.Infrastructure;
 using HelixScheduler.WebApi.Extensions;
+using HelixScheduler.WebApi.Tenancy;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,8 @@ if (app.Environment.IsDevelopment())
 await app.UseHelixSchedulerDemoSeedAsync();
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseCors("DemoWeb");
 app.UseAuthorization();

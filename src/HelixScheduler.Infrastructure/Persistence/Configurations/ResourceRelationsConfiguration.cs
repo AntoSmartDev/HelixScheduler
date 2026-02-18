@@ -11,10 +11,15 @@ public sealed class ResourceRelationsConfiguration : IEntityTypeConfiguration<Re
         builder.ToTable("ResourceRelations");
         builder.HasKey(relation => new
         {
+            relation.TenantId,
             relation.ParentResourceId,
             relation.ChildResourceId,
             relation.RelationType
         });
+
+        builder.Property(relation => relation.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.Property(relation => relation.RelationType)
             .HasMaxLength(50)
@@ -22,12 +27,16 @@ public sealed class ResourceRelationsConfiguration : IEntityTypeConfiguration<Re
 
         builder.HasOne(relation => relation.ParentResource)
             .WithMany(resource => resource.ParentRelations)
-            .HasForeignKey(relation => relation.ParentResourceId)
+            .HasForeignKey(relation => new { relation.TenantId, relation.ParentResourceId })
+            .HasPrincipalKey(resource => new { resource.TenantId, resource.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(relation => relation.ChildResource)
             .WithMany(resource => resource.ChildRelations)
-            .HasForeignKey(relation => relation.ChildResourceId)
+            .HasForeignKey(relation => new { relation.TenantId, relation.ChildResourceId })
+            .HasPrincipalKey(resource => new { resource.TenantId, resource.Id })
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(relation => new { relation.TenantId, relation.ChildResourceId });
     }
 }

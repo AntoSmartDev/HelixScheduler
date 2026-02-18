@@ -10,9 +10,14 @@ public sealed class BusyEventsConfiguration : IEntityTypeConfiguration<BusyEvent
     {
         builder.ToTable("BusyEvents");
         builder.HasKey(busyEvent => busyEvent.Id);
+        builder.HasAlternateKey(busyEvent => new { busyEvent.TenantId, busyEvent.Id });
 
         builder.Property(busyEvent => busyEvent.Id)
             .ValueGeneratedOnAdd();
+
+        builder.Property(busyEvent => busyEvent.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.Property(busyEvent => busyEvent.Title)
             .HasMaxLength(300);
@@ -32,6 +37,11 @@ public sealed class BusyEventsConfiguration : IEntityTypeConfiguration<BusyEvent
             .HasColumnType("datetime2")
             .IsRequired();
 
-        builder.HasIndex(busyEvent => new { busyEvent.StartUtc, busyEvent.EndUtc });
+        builder.HasOne<Tenants>()
+            .WithMany()
+            .HasForeignKey(busyEvent => busyEvent.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(busyEvent => new { busyEvent.TenantId, busyEvent.StartUtc, busyEvent.EndUtc });
     }
 }

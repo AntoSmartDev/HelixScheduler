@@ -18,15 +18,15 @@ public sealed class PropertyRepository : IPropertyRepository
     {
         const string sql = """
             WITH PropertyTree AS (
-                SELECT Id, ParentId, [Key], Label, SortOrder
+                SELECT Id, ParentId, [Key], Label, SortOrder, TenantId
                 FROM ResourceProperties
                 WHERE Id = {0}
                 UNION ALL
-                SELECT rp.Id, rp.ParentId, rp.[Key], rp.Label, rp.SortOrder
+                SELECT rp.Id, rp.ParentId, rp.[Key], rp.Label, rp.SortOrder, rp.TenantId
                 FROM ResourceProperties rp
-                INNER JOIN PropertyTree pt ON rp.ParentId = pt.Id
+                INNER JOIN PropertyTree pt ON rp.ParentId = pt.Id AND rp.TenantId = pt.TenantId
             )
-            SELECT Id, ParentId, [Key], Label, SortOrder
+            SELECT Id, ParentId, [Key], Label, SortOrder, TenantId
             FROM PropertyTree
             """;
 

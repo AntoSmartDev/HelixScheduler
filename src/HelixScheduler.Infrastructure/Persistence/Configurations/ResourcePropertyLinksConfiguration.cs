@@ -9,18 +9,24 @@ public sealed class ResourcePropertyLinksConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<ResourcePropertyLinks> builder)
     {
         builder.ToTable("ResourcePropertyLinks");
-        builder.HasKey(link => new { link.ResourceId, link.PropertyId });
+        builder.HasKey(link => new { link.TenantId, link.ResourceId, link.PropertyId });
+
+        builder.Property(link => link.TenantId)
+            .HasColumnType("uniqueidentifier")
+            .IsRequired();
 
         builder.HasOne(link => link.Resource)
             .WithMany(resource => resource.PropertyLinks)
-            .HasForeignKey(link => link.ResourceId)
+            .HasForeignKey(link => new { link.TenantId, link.ResourceId })
+            .HasPrincipalKey(resource => new { resource.TenantId, resource.Id })
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(link => link.Property)
             .WithMany(property => property.PropertyLinks)
-            .HasForeignKey(link => link.PropertyId)
+            .HasForeignKey(link => new { link.TenantId, link.PropertyId })
+            .HasPrincipalKey(property => new { property.TenantId, property.Id })
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(link => new { link.PropertyId, link.ResourceId });
+        builder.HasIndex(link => new { link.TenantId, link.PropertyId, link.ResourceId });
     }
 }

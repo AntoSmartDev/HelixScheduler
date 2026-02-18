@@ -24,15 +24,18 @@ namespace HelixScheduler.Infrastructure.Migrations
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.BusyEventResources", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<long>("BusyEventId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("ResourceId")
                         .HasColumnType("int");
 
-                    b.HasKey("BusyEventId", "ResourceId");
+                    b.HasKey("TenantId", "BusyEventId", "ResourceId");
 
-                    b.HasIndex("ResourceId", "BusyEventId");
+                    b.HasIndex("TenantId", "ResourceId", "BusyEventId");
 
                     b.ToTable("BusyEventResources", (string)null);
                 });
@@ -58,13 +61,16 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Property<DateTime>("StartUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Title")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("StartUtc", "EndUtc");
+                    b.HasIndex("TenantId", "StartUtc", "EndUtc");
 
                     b.ToTable("BusyEvents", (string)null);
                 });
@@ -83,10 +89,16 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Property<int>("SeedVersion")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
 
                     b.ToTable("DemoScenarioStates", (string)null);
                 });
@@ -115,30 +127,41 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Property<int?>("SortOrder")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ParentId");
+                    b.HasIndex("TenantId", "Key");
+
+                    b.HasIndex("TenantId", "ParentId");
 
                     b.ToTable("ResourceProperties", (string)null);
                 });
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.ResourcePropertyLinks", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ResourceId")
                         .HasColumnType("int");
 
                     b.Property<int>("PropertyId")
                         .HasColumnType("int");
 
-                    b.HasKey("ResourceId", "PropertyId");
+                    b.HasKey("TenantId", "ResourceId", "PropertyId");
 
-                    b.HasIndex("PropertyId", "ResourceId");
+                    b.HasIndex("TenantId", "PropertyId", "ResourceId");
 
                     b.ToTable("ResourcePropertyLinks", (string)null);
                 });
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.ResourceRelations", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ParentResourceId")
                         .HasColumnType("int");
 
@@ -149,24 +172,27 @@ namespace HelixScheduler.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.HasKey("ParentResourceId", "ChildResourceId", "RelationType");
+                    b.HasKey("TenantId", "ParentResourceId", "ChildResourceId", "RelationType");
 
-                    b.HasIndex("ChildResourceId");
+                    b.HasIndex("TenantId", "ChildResourceId");
 
                     b.ToTable("ResourceRelations", (string)null);
                 });
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.ResourceTypeProperties", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ResourceTypeId")
                         .HasColumnType("int");
 
                     b.Property<int>("PropertyDefinitionId")
                         .HasColumnType("int");
 
-                    b.HasKey("ResourceTypeId", "PropertyDefinitionId");
+                    b.HasKey("TenantId", "ResourceTypeId", "PropertyDefinitionId");
 
-                    b.HasIndex("PropertyDefinitionId", "ResourceTypeId");
+                    b.HasIndex("TenantId", "PropertyDefinitionId", "ResourceTypeId");
 
                     b.ToTable("ResourceTypeProperties", (string)null);
                 });
@@ -192,9 +218,13 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Property<int?>("SortOrder")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Key");
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
 
                     b.ToTable("ResourceTypes", (string)null);
                 });
@@ -227,6 +257,9 @@ namespace HelixScheduler.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("TypeId")
                         .HasColumnType("int");
 
@@ -234,9 +267,11 @@ namespace HelixScheduler.Infrastructure.Migrations
 
                     b.HasIndex("Code");
 
-                    b.HasIndex("IsSchedulable");
+                    b.HasIndex("TenantId", "Code");
 
-                    b.HasIndex("TypeId");
+                    b.HasIndex("TenantId", "IsSchedulable");
+
+                    b.HasIndex("TenantId", "TypeId");
 
                     b.ToTable("Resources", null, t =>
                         {
@@ -246,15 +281,18 @@ namespace HelixScheduler.Infrastructure.Migrations
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.RuleResources", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<long>("RuleId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("ResourceId")
                         .HasColumnType("int");
 
-                    b.HasKey("RuleId", "ResourceId");
+                    b.HasKey("TenantId", "RuleId", "ResourceId");
 
-                    b.HasIndex("ResourceId", "RuleId");
+                    b.HasIndex("TenantId", "ResourceId", "RuleId");
 
                     b.ToTable("RuleResources", (string)null);
                 });
@@ -297,6 +335,9 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Title")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
@@ -306,24 +347,51 @@ namespace HelixScheduler.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FromDateUtc", "ToDateUtc", "SingleDateUtc");
+                    b.HasIndex("TenantId", "FromDateUtc", "ToDateUtc", "SingleDateUtc");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FromDateUtc", "ToDateUtc", "SingleDateUtc"), new[] { "IsExclude" });
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "FromDateUtc", "ToDateUtc", "SingleDateUtc"), new[] { "IsExclude" });
 
                     b.ToTable("Rules", (string)null);
+                });
+
+            modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("Tenants", (string)null);
                 });
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.BusyEventResources", b =>
                 {
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.BusyEvents", "BusyEvent")
                         .WithMany("BusyEventResources")
-                        .HasForeignKey("BusyEventId")
+                        .HasForeignKey("TenantId", "BusyEventId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Resources", "Resource")
                         .WithMany("BusyEventResources")
-                        .HasForeignKey("ResourceId")
+                        .HasForeignKey("TenantId", "ResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -332,11 +400,36 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Navigation("Resource");
                 });
 
+            modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.BusyEvents", b =>
+                {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.DemoScenarioStates", b =>
+                {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.ResourceProperties", b =>
                 {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.ResourceProperties", "Parent")
                         .WithMany("Children")
-                        .HasForeignKey("ParentId")
+                        .HasForeignKey("TenantId", "ParentId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Parent");
@@ -346,13 +439,15 @@ namespace HelixScheduler.Infrastructure.Migrations
                 {
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.ResourceProperties", "Property")
                         .WithMany("PropertyLinks")
-                        .HasForeignKey("PropertyId")
+                        .HasForeignKey("TenantId", "PropertyId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Resources", "Resource")
                         .WithMany("PropertyLinks")
-                        .HasForeignKey("ResourceId")
+                        .HasForeignKey("TenantId", "ResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -365,13 +460,15 @@ namespace HelixScheduler.Infrastructure.Migrations
                 {
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Resources", "ChildResource")
                         .WithMany("ChildRelations")
-                        .HasForeignKey("ChildResourceId")
+                        .HasForeignKey("TenantId", "ChildResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Resources", "ParentResource")
                         .WithMany("ParentRelations")
-                        .HasForeignKey("ParentResourceId")
+                        .HasForeignKey("TenantId", "ParentResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -384,13 +481,15 @@ namespace HelixScheduler.Infrastructure.Migrations
                 {
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.ResourceProperties", "PropertyDefinition")
                         .WithMany()
-                        .HasForeignKey("PropertyDefinitionId")
+                        .HasForeignKey("TenantId", "PropertyDefinitionId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.ResourceTypes", "ResourceType")
                         .WithMany("ResourceTypeProperties")
-                        .HasForeignKey("ResourceTypeId")
+                        .HasForeignKey("TenantId", "ResourceTypeId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -399,11 +498,27 @@ namespace HelixScheduler.Infrastructure.Migrations
                     b.Navigation("ResourceType");
                 });
 
+            modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.ResourceTypes", b =>
+                {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.Resources", b =>
                 {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.ResourceTypes", "Type")
                         .WithMany("Resources")
-                        .HasForeignKey("TypeId")
+                        .HasForeignKey("TenantId", "TypeId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -414,19 +529,30 @@ namespace HelixScheduler.Infrastructure.Migrations
                 {
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Resources", "Resource")
                         .WithMany("RuleResources")
-                        .HasForeignKey("ResourceId")
+                        .HasForeignKey("TenantId", "ResourceId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Rules", "Rule")
                         .WithMany("RuleResources")
-                        .HasForeignKey("RuleId")
+                        .HasForeignKey("TenantId", "RuleId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Resource");
 
                     b.Navigation("Rule");
+                });
+
+            modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.Rules", b =>
+                {
+                    b.HasOne("HelixScheduler.Infrastructure.Persistence.Entities.Tenants", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HelixScheduler.Infrastructure.Persistence.Entities.BusyEvents", b =>

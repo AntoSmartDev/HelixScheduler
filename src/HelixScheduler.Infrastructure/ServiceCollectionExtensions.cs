@@ -1,3 +1,4 @@
+using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Diagnostics;
@@ -9,6 +10,7 @@ using HelixScheduler.Infrastructure.Persistence;
 using HelixScheduler.Infrastructure.Persistence.Repositories;
 using HelixScheduler.Infrastructure.Persistence.Seed;
 using HelixScheduler.Infrastructure.Startup;
+using HelixScheduler.Infrastructure.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +43,8 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        services.AddScoped<ITenantContext, TenantContext>();
+        services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IRuleRepository, RuleRepository>();
         services.AddScoped<IBusyEventRepository, BusyEventRepository>();
         services.AddScoped<IPropertyRepository, PropertyRepository>();

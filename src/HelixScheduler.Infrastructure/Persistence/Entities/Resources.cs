@@ -3,6 +3,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Entities;
 public sealed class Resources
 {
     public int Id { get; set; }
+    public Guid TenantId { get; set; }
     public string? Code { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsSchedulable { get; set; }

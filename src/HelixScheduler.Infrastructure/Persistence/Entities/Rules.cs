@@ -3,6 +3,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Entities;
 public sealed class Rules
 {
     public long Id { get; set; }
+    public Guid TenantId { get; set; }
     public byte Kind { get; set; }
     public bool IsExclude { get; set; }
     public string? Title { get; set; }

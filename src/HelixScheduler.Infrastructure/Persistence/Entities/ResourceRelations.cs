@@ -2,6 +2,7 @@ namespace HelixScheduler.Infrastructure.Persistence.Entities;
 
 public sealed class ResourceRelations
 {
+    public Guid TenantId { get; set; }
     public int ParentResourceId { get; set; }
     public int ChildResourceId { get; set; }
     public string RelationType { get; set; } = string.Empty;
