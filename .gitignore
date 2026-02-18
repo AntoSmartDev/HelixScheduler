@@ -24,3 +24,4 @@ TestResults/
 # Rider
 .idea/
 /BenchmarkDotNet.Artifacts
+/README - IT.md
