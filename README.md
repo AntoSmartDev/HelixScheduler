@@ -278,8 +278,8 @@ The engine can select only resources whose organizational context satisfies cons
 
 Availability is requested by providing:
 
-- time range (date range, always UTC)
-- slot duration (`slotMinutes`)
+- time range (date range, always UTC, date-only)
+- slot duration (`slotDurationMinutes`)
 - required resources
 - optional AND / OR groups
 - property filters
@@ -434,7 +434,9 @@ curl -X POST http://localhost:5000/api/availability/compute \
   -d '{
     "fromDate": "2026-01-05",
     "toDate": "2026-01-05",
-    "requiredResourceIds": [1]
+    "requiredResourceIds": [1],
+    "slotDurationMinutes": 30,
+    "includeRemainderSlot": false
   }'
 ```
 
@@ -446,7 +448,26 @@ curl -X POST http://localhost:5000/api/availability/compute \
   -d '{
     "fromDate": "2026-01-05",
     "toDate": "2026-01-05",
-    "requiredResourceIds": [1]
+    "requiredResourceIds": [1],
+    "slotDurationMinutes": 30,
+    "includeRemainderSlot": false
+  }'
+```
+
+### Compute with ancestors and OR groups
+```bash
+curl -X POST http://localhost:5000/api/availability/compute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromDate": "2026-01-05",
+    "toDate": "2026-01-05",
+    "requiredResourceIds": [1],
+    "resourceOrGroups": [[2,3],[10,11,12]],
+    "includeResourceAncestors": true,
+    "ancestorRelationTypes": ["Contains"],
+    "ancestorMode": "perGroup",
+    "slotDurationMinutes": 30,
+    "includeRemainderSlot": false
   }'
 ```
 
