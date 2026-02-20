@@ -1,13 +1,15 @@
 ﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+# HelixScheduler .gitignore
 ################################################################################
 
+# Private working folder
 /_private
+
 # Build outputs
 **/bin/
 **/obj/
 
-# VS / user-specific
+# IDE - Visual Studio
 .vs/
 *.user
 *.suo
@@ -15,12 +17,23 @@
 *.sln.docstates
 *.slnLaunch.user
 
+# Rider / JetBrains
+.idea/
+
 # Test results / coverage
 TestResults/
 *.trx
 *.coverage
 *.coveragexml
 
-# Rider
-.idea/
-/BenchmarkDotNet.Artifacts
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# Logs & local files
+*.log
+*.cache
+*.pid
+
+# OS files
+.DS_Store
+Thumbs.db
