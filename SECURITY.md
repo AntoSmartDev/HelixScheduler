@@ -1,7 +1,7 @@
 # Security Policy
 
 ## Reporting a Vulnerability
-Please report security issues privately by opening a GitHub Security Advisory or by contacting the maintainers directly.
+Please report security issues privately by opening a GitHub Security Advisory.
 
 We will acknowledge receipt within 72 hours and provide a remediation timeline when appropriate.
 

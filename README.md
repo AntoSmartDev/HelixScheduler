@@ -2,7 +2,7 @@
 
 **Deterministic scheduling engine for real-world resource planning on modern .NET**
 
-HelixScheduler is designed to be the **logical core of planning systems**: the place where availability is defined once and computed correctly, even in the presence of complex rules, organizational hierarchies, concurrent capacity, and structural constraints.
+HelixScheduler is designed to be the logical core of planning systems: the place where availability is defined once and computed correctly, even in the presence of complex rules, organizational hierarchies, concurrent capacity, and structural constraints.
 
 Rendering a calendar is easy. Computing what can actually be shown is not.
 
@@ -10,7 +10,7 @@ Rendering a calendar is easy. Computing what can actually be shown is not.
 
 # What Is HelixScheduler
 
-HelixScheduler is a **deterministic foundational engine** designed to:
+HelixScheduler is a core scheduling engine designed to:
 
 - model resource availability
 - apply recurring rules and exceptions
@@ -26,7 +26,7 @@ Its purpose is to solve, in a coherent and explainable way, the most critical pa
 
 ## Determinism
 
-With the same inputs — rules, unavailability, busy slots, properties, and calculation options — the result is always identical.
+With the same inputs - rules, unavailability, busy slots, properties, and calculation options - the result is always identical.
 
 The engine contains no heuristics, randomness, or implicit behavior. Computation is fully deterministic and verifiable.
 
@@ -56,7 +56,7 @@ Implementing these rules directly on calendar events quickly leads to:
 - conflicts that are hard to detect
 - non-scalable models
 
-HelixScheduler separates **availability logic** from user interfaces and booking management.
+HelixScheduler separates availability logic from user interfaces and booking management.
 
 The engine computes. The application decides how to use the result.
 
@@ -108,9 +108,9 @@ Everything is a resource:
 
 Resources can be organized in hierarchical relations:
 
-- Site ? Room
-- Department ? Doctor
-- Facility ? Clinic
+- Site -> Room
+- Department -> Doctor
+- Facility -> Clinic
 
 You can request that the calculation also accounts for ancestor availability (`includeResourceAncestors`).
 
@@ -126,11 +126,11 @@ Without duplicating unavailability on child resources.
 
 ## Rules
 
-Rules define **structural availability**.
+Rules define structural availability.
 
 Examples:
 
-- Mon–Fri 09:00–18:00
+- Mon-Fri 09:00-18:00
 - Tuesdays only
 - every first Monday of the month
 - until a certain date
@@ -156,7 +156,7 @@ An unavailability is equivalent to capacity = 0 for that interval.
 
 ## Busy Slots
 
-In real systems, busy slots derive from domain bookings and can be projected/sent to the engine as normalized input at calculation time.
+In real systems, busy slots derive from domain bookings and can be projected or sent to the engine as normalized input at calculation time.
 
 They represent real resource usage.
 
@@ -180,10 +180,10 @@ Each resource can have a capacity.
 
 Examples:
 
-- doctor ? 1
-- mobile ultrasound ? 1
-- laboratory ? 3
-- classroom ? 20
+- doctor -> 1
+- mobile ultrasound -> 1
+- laboratory -> 3
+- classroom -> 20
 
 Availability is computed as:
 
@@ -200,10 +200,10 @@ Resources can have properties organized in categories and hierarchies.
 
 Example:
 
-Diagnostics  
-? Ultrasound  
-? X-ray  
-? CT
+Diagnostics
+-> Ultrasound
+-> X-ray
+-> CT
 
 With `includeDescendants` you can filter by a category and automatically include all specializations.
 
@@ -349,11 +349,11 @@ The engine remains deterministic and tenant-neutral.
 
 # Architecture
 
-- **Core** ? pure deterministic engine
-- **Application** ? orchestration
-- **Infrastructure** ? persistence and isolation
-- **WebApi** ? HTTP exposure
-- **DemoWeb** ? demo interface
+- Core -> pure deterministic engine
+- Application -> orchestration
+- Infrastructure -> persistence and isolation
+- WebApi -> HTTP exposure
+- DemoWeb -> demo interface
 
 The Core is independent from databases, HTTP, or external frameworks.
 
@@ -480,7 +480,7 @@ curl "http://localhost:5000/api/availability/slots?fromDate=2026-01-05&toDate=20
 
 # Demo Application
 
-HelixScheduler includes a **DemoWeb application** that showcases the engine in action.
+HelixScheduler includes a DemoWeb application that showcases the engine in action.
 
 The demo is intentionally:
 
@@ -494,7 +494,7 @@ This demonstrates that the engine is completely separated from the interface.
 
 ## Explorer
 
-The **Explorer** page allows you to:
+The Explorer page allows you to:
 
 - navigate resources
 - view hierarchical relations
@@ -513,7 +513,7 @@ It uses only catalog endpoints:
 
 ## Availability Search
 
-The **Availability** page allows you to:
+The Availability page allows you to:
 
 - select a time range (UTC)
 - set slot duration (`slotMinutes`)
@@ -538,9 +538,9 @@ It shows:
 
 ## Interaction Flow
 
-UI ? WebApi ? Application ? Core ? normalized result ? UI
+UI -> WebApi -> Application -> Core -> normalized result -> UI
 
-The demo contains no computation logic.  
+The demo contains no computation logic.
 All availability is produced by the engine.
 
 ---
