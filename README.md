@@ -408,20 +408,62 @@ Example `appsettings.json`:
 
 Note: SQLite support is currently disabled by configuration. Use SQL Server.
 
-### Migrations
+
+## Quickstart
+
+### 1. Apply database migrations (create/update the database schema)
+
 ```bash
- dotnet ef database update \
-   --project src/HelixScheduler.Infrastructure \
-   --startup-project src/HelixScheduler.WebApi
+dotnet ef database update --startup-project src/HelixScheduler.WebApi
 ```
 
-## Run the WebApi
+This command creates or updates the database schema using EF Core migrations.
+At this stage, the tables are created but contain no data.
+
+---
+
+### 2. Run the WebApi (demo seed runs automatically)
+
 ```bash
- dotnet run --project src/HelixScheduler.WebApi
+dotnet run --project src/HelixScheduler.WebApi
 ```
 
-## Demo Seed
-The demo seed runs at startup in non-`Testing` environments and loads example data. Disable or adapt for production usage.
+On startup (in non-`Testing` environments), the WebApi executes the demo seed and populates:
+
+- Resources
+- Scheduling rules
+- Busy intervals
+- Demo scenario state (relative to the first run date)
+
+> The demo seed is intended for development and demonstration purposes.
+> Disable or replace it for production usage.
+
+---
+
+### 3. Run the DemoWeb UI
+
+Open a second terminal and run:
+
+```bash
+dotnet run --project src/HelixScheduler.DemoWeb
+```
+
+The DemoWeb project is a read-only UI that calls the WebApi and renders availability results.
+
+---
+
+### Running both projects in Visual Studio
+
+If using Visual Studio:
+
+1. Right click the solution → **Set Startup Projects...**
+2. Select **Multiple startup projects**
+3. Set:
+   - `HelixScheduler.WebApi` → **Start**
+   - `HelixScheduler.DemoWeb` → **Start**
+4. Click **OK**
+5. Press **F5**
+
 
 ---
 
