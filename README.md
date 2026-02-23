@@ -409,7 +409,7 @@ Example `appsettings.json`:
 Note: SQLite support is currently disabled by configuration. Use SQL Server.
 
 
-## Quickstart
+## Migrations 
 
 ### 1. Apply database migrations (create/update the database schema)
 
