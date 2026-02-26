@@ -549,7 +549,7 @@ It uses only catalog endpoints:
 - `GET /api/catalog/resources`
 - `GET /api/catalog/properties`
 
-![Explorer](assets/screenshots/explorer.png)
+![Explorer](assets/screenshots/explorer.jpeg)
 
 ---
 
@@ -574,7 +574,7 @@ It shows:
 - deterministic behavior as parameters change
 - the effect of capacity, unavailability, and busy slots
 
-![Availability](assets/screenshots/availability.png)
+![Availability](assets/screenshots/availability.jpeg)
 
 ---
 
