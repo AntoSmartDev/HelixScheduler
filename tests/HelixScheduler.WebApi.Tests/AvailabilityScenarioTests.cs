@@ -136,6 +136,34 @@ public sealed class AvailabilityScenarioTests
     }
 
     [Fact]
+    public async Task OrGroups_With_Ancestors_PerGroup_Preserves_Result()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            ResourceOrGroups: new[]
+            {
+                new[] { DemoAvailabilityDataSource.Doctor7Id, DemoAvailabilityDataSource.Doctor8Id },
+                new[] { DemoAvailabilityDataSource.Room1Id, DemoAvailabilityDataSource.Room4Id }
+            },
+            IncludeResourceAncestors: true,
+            AncestorMode: "perGroup");
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 14, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 15, 0, 0, DateTimeKind.Utc));
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 16, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 16, 30, 0, DateTimeKind.Utc));
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 17, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 18, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
     public async Task PropertyDescendants_Match_Imaging_Rooms()
     {
         var request = new AvailabilityComputeRequest(

@@ -95,4 +95,83 @@ public sealed class RuleRepository : IRuleRepository
 
         return result;
     }
+
+    public async Task<IReadOnlyList<RuleComputeRow>> GetRulesForComputeAsync(
+        DateOnly fromDateUtc,
+        DateOnly toDateUtc,
+        IReadOnlyCollection<int> resourceIds,
+        CancellationToken ct)
+    {
+        if (resourceIds.Count == 0)
+        {
+            return Array.Empty<RuleComputeRow>();
+        }
+
+        var rows = await _dbContext.RuleResources
+            .AsNoTracking()
+            .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link =>
+                (link.Rule.SingleDateUtc != null && link.Rule.SingleDateUtc >= fromDateUtc && link.Rule.SingleDateUtc <= toDateUtc) ||
+                (link.Rule.FromDateUtc != null && link.Rule.ToDateUtc != null && link.Rule.FromDateUtc <= toDateUtc && link.Rule.ToDateUtc >= fromDateUtc) ||
+                (link.Rule.FromDateUtc != null && link.Rule.ToDateUtc == null && link.Rule.FromDateUtc <= toDateUtc) ||
+                (link.Rule.FromDateUtc == null && link.Rule.ToDateUtc != null && link.Rule.ToDateUtc >= fromDateUtc) ||
+                (link.Rule.FromDateUtc == null && link.Rule.ToDateUtc == null && link.Rule.SingleDateUtc == null))
+            .Select(link => new
+            {
+                link.Rule.Id,
+                link.Rule.Kind,
+                link.Rule.IsExclude,
+                link.Rule.FromDateUtc,
+                link.Rule.ToDateUtc,
+                link.Rule.SingleDateUtc,
+                link.Rule.StartTime,
+                link.Rule.EndTime,
+                link.Rule.DaysOfWeekMask,
+                link.Rule.DayOfMonth,
+                link.Rule.IntervalDays,
+                ResourceId = link.ResourceId
+            })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (rows.Count == 0)
+        {
+            return Array.Empty<RuleComputeRow>();
+        }
+
+        var grouped = rows.GroupBy(row => new
+        {
+            row.Id,
+            row.Kind,
+            row.IsExclude,
+            row.FromDateUtc,
+            row.ToDateUtc,
+            row.SingleDateUtc,
+            row.StartTime,
+            row.EndTime,
+            row.DaysOfWeekMask,
+            row.DayOfMonth,
+            row.IntervalDays
+        });
+
+        var result = new List<RuleComputeRow>();
+        foreach (var group in grouped)
+        {
+            result.Add(new RuleComputeRow(
+                group.Key.Id,
+                group.Key.Kind,
+                group.Key.IsExclude,
+                group.Key.FromDateUtc,
+                group.Key.ToDateUtc,
+                group.Key.SingleDateUtc,
+                group.Key.StartTime,
+                group.Key.EndTime,
+                group.Key.DaysOfWeekMask,
+                group.Key.DayOfMonth,
+                group.Key.IntervalDays,
+                group.Select(item => item.ResourceId).ToList()));
+        }
+
+        return result;
+    }
 }

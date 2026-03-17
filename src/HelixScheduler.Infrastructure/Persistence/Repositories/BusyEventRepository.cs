@@ -69,4 +69,54 @@ public sealed class BusyEventRepository : IBusyEventRepository
 
         return result;
     }
+
+    public async Task<IReadOnlyList<BusyEventComputeRow>> GetBusyForComputeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        IReadOnlyCollection<int> resourceIds,
+        CancellationToken ct)
+    {
+        if (resourceIds.Count == 0)
+        {
+            return Array.Empty<BusyEventComputeRow>();
+        }
+
+        var rows = await _dbContext.BusyEventResources
+            .AsNoTracking()
+            .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link => link.BusyEvent.StartUtc < toUtc && link.BusyEvent.EndUtc > fromUtc)
+            .Select(link => new
+            {
+                link.BusyEvent.Id,
+                link.BusyEvent.StartUtc,
+                link.BusyEvent.EndUtc,
+                ResourceId = link.ResourceId
+            })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (rows.Count == 0)
+        {
+            return Array.Empty<BusyEventComputeRow>();
+        }
+
+        var grouped = rows.GroupBy(row => new
+        {
+            row.Id,
+            row.StartUtc,
+            row.EndUtc
+        });
+
+        var result = new List<BusyEventComputeRow>();
+        foreach (var group in grouped)
+        {
+            result.Add(new BusyEventComputeRow(
+                group.Key.Id,
+                group.Key.StartUtc,
+                group.Key.EndUtc,
+                group.Select(item => item.ResourceId).ToList()));
+        }
+
+        return result;
+    }
 }

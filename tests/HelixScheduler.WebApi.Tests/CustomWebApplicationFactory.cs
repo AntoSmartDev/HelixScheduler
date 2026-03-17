@@ -64,6 +64,28 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             return Task.FromResult<IReadOnlyList<RuleRow>>(rules);
         }
 
+        public async Task<IReadOnlyList<RuleComputeRow>> GetRulesForComputeAsync(
+            DateOnly fromDateUtc,
+            DateOnly toDateUtc,
+            IReadOnlyCollection<int> resourceIds,
+            CancellationToken ct)
+        {
+            var rows = await GetRulesAsync(fromDateUtc, toDateUtc, resourceIds, ct).ConfigureAwait(false);
+            return rows.Select(rule => new RuleComputeRow(
+                rule.Id,
+                rule.Kind,
+                rule.IsExclude,
+                rule.FromDateUtc,
+                rule.ToDateUtc,
+                rule.SingleDateUtc,
+                rule.StartTime,
+                rule.EndTime,
+                rule.DaysOfWeekMask,
+                rule.DayOfMonth,
+                rule.IntervalDays,
+                rule.ResourceIds)).ToList();
+        }
+
         private static (int DaysMask, TimeOnly Start, TimeOnly End) GetRulePattern(int resourceId)
         {
             if (resourceId is 4 or 5)
@@ -146,6 +168,20 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             }
 
             return Task.FromResult<IReadOnlyList<BusyEventRow>>(filtered);
+        }
+
+        public async Task<IReadOnlyList<BusyEventComputeRow>> GetBusyForComputeAsync(
+            DateTime fromUtc,
+            DateTime toUtc,
+            IReadOnlyCollection<int> resourceIds,
+            CancellationToken ct)
+        {
+            var rows = await GetBusyAsync(fromUtc, toUtc, resourceIds, ct).ConfigureAwait(false);
+            return rows.Select(busy => new BusyEventComputeRow(
+                busy.Id,
+                busy.StartUtc,
+                busy.EndUtc,
+                busy.ResourceIds)).ToList();
         }
 
         private static BusyEventRow CreateBusyEvent(

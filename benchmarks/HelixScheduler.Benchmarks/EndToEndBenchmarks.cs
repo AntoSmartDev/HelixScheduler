@@ -1,4 +1,4 @@
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Exporters;
@@ -32,7 +32,8 @@ public class EndToEndBenchmarks
         var options = new DbContextOptionsBuilder<SchedulerDbContext>()
             .UseInMemoryDatabase(dbName)
             .Options;
-        _dbContext = new SchedulerDbContext(options);
+        var tenantContext = new BenchmarkTenantContext();
+        _dbContext = new SchedulerDbContext(options, tenantContext);
         _dbContext.Database.EnsureCreated();
         SeedBenchmarkData();
 
@@ -247,6 +248,17 @@ public class EndToEndBenchmarks
             AddExporter(MarkdownExporter.GitHub, CsvExporter.Default, HtmlExporter.Default);
         }
     }
+    private sealed class BenchmarkTenantContext : ITenantContext
+    {
+        public Guid TenantId { get; private set; } = Guid.Empty;
+        public string TenantKey { get; private set; } = "benchmark";
+
+        public void SetTenant(Guid tenantId, string tenantKey)
+        {
+            TenantId = tenantId;
+            TenantKey = tenantKey;
+        }
+    }
 
     private sealed class BenchmarkPropertyRepository : IPropertyRepository
     {
@@ -366,3 +378,5 @@ public class EndToEndBenchmarks
     }
 
 }
+
+

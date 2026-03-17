@@ -341,6 +341,11 @@ public sealed class AvailabilityService : IAvailabilityService
                 }
             }
 
+            if (propertyFiltered == null)
+            {
+                return AvailabilityComputation.Empty();
+            }
+
             filteredResourceIds.IntersectWith(propertyFiltered);
         }
 
@@ -505,14 +510,16 @@ public sealed class AvailabilityService : IAvailabilityService
 
         var inputs = new AvailabilityInputs(ruleModels, busySlots, resourceCapacities);
         var ancestorMode = NormalizeAncestorMode(request.AncestorMode) ?? "perGroup";
+        IReadOnlyDictionary<int, List<UtcSlot>>? perResourceAvailability = null;
 
         if (includeAncestors && ancestorMode == "perGroup")
         {
+            perResourceAvailability = BuildPerResourceAvailability(period, resourceIdList, inputs);
             var requiredWithAncestors = ExpandRequiredAncestors(filteredRequiredIds, ancestorExpansion);
             if (filteredOrGroups.Count == 0)
             {
                 var query = new AvailabilityQuery(period, requiredWithAncestors);
-                var result = _engine.Compute(query, inputs);
+                var result = _engine.ComposeAvailability(query, perResourceAvailability);
                 return new AvailabilityComputation(result, hasPositive, hasNegative, busySlots.Count > 0);
             }
 
@@ -522,7 +529,7 @@ public sealed class AvailabilityService : IAvailabilityService
                 filteredOrGroups,
                 ancestorExpansion,
                 resourceIdList,
-                inputs);
+                perResourceAvailability);
             return new AvailabilityComputation(resultWithAncestors, hasPositive, hasNegative, busySlots.Count > 0);
         }
 
@@ -532,7 +539,8 @@ public sealed class AvailabilityService : IAvailabilityService
 
         if (globalRequired.Count == 0 && filteredOrGroups.Count > 0)
         {
-            var result = ComputeOrOnlyAvailability(period, filteredOrGroups, resourceIdList, inputs);
+            perResourceAvailability = BuildPerResourceAvailability(period, resourceIdList, inputs);
+            var result = ComputeOrOnlyAvailability(period, filteredOrGroups, resourceIdList, perResourceAvailability);
             return new AvailabilityComputation(result, hasPositive, hasNegative, busySlots.Count > 0);
         }
 
@@ -1138,7 +1146,7 @@ public sealed class AvailabilityService : IAvailabilityService
         IReadOnlyList<List<int>> orGroups,
         AncestorExpansion expansion,
         IReadOnlyList<int> allResourceIds,
-        AvailabilityInputs inputs)
+        IReadOnlyDictionary<int, List<UtcSlot>> perResourceAvailability)
     {
         List<UtcSlot>? intersection = null;
 
@@ -1150,7 +1158,13 @@ public sealed class AvailabilityService : IAvailabilityService
                 return new AvailabilityResult(Array.Empty<UtcSlot>());
             }
 
-            var union = UnionGroupAvailabilityWithAncestors(period, requiredIds, group, expansion, allResourceIds, inputs);
+            var union = UnionGroupAvailabilityWithAncestors(
+                period,
+                requiredIds,
+                group,
+                expansion,
+                allResourceIds,
+                perResourceAvailability);
             if (union.Count == 0)
             {
                 return new AvailabilityResult(Array.Empty<UtcSlot>());
@@ -1181,7 +1195,7 @@ public sealed class AvailabilityService : IAvailabilityService
         IReadOnlyList<int> groupResourceIds,
         AncestorExpansion expansion,
         IReadOnlyList<int> allResourceIds,
-        AvailabilityInputs inputs)
+        IReadOnlyDictionary<int, List<UtcSlot>> perResourceAvailability)
     {
         var slots = new List<UtcSlot>();
         for (var i = 0; i < groupResourceIds.Count; i++)
@@ -1196,7 +1210,7 @@ public sealed class AvailabilityService : IAvailabilityService
             var requiredList = required.ToList();
             requiredList.Sort();
             var query = new AvailabilityQuery(period, requiredList);
-            var result = _engine.Compute(query, inputs);
+            var result = _engine.ComposeAvailability(query, perResourceAvailability);
             for (var s = 0; s < result.Slots.Count; s++)
             {
                 var slot = result.Slots[s];
@@ -1613,7 +1627,7 @@ public sealed class AvailabilityService : IAvailabilityService
         DatePeriod period,
         IReadOnlyList<List<int>> orGroups,
         IReadOnlyList<int> allResourceIds,
-        AvailabilityInputs inputs)
+        IReadOnlyDictionary<int, List<UtcSlot>> perResourceAvailability)
     {
         List<UtcSlot>? intersection = null;
 
@@ -1625,7 +1639,7 @@ public sealed class AvailabilityService : IAvailabilityService
                 return new AvailabilityResult(Array.Empty<UtcSlot>());
             }
 
-            var union = UnionGroupAvailability(period, group, inputs, allResourceIds);
+            var union = UnionGroupAvailability(group, allResourceIds, perResourceAvailability);
             if (union.Count == 0)
             {
                 return new AvailabilityResult(Array.Empty<UtcSlot>());
@@ -1651,25 +1665,40 @@ public sealed class AvailabilityService : IAvailabilityService
     }
 
     private List<UtcSlot> UnionGroupAvailability(
-        DatePeriod period,
         IReadOnlyList<int> groupResourceIds,
-        AvailabilityInputs inputs,
-        IReadOnlyList<int> allResourceIds)
+        IReadOnlyList<int> allResourceIds,
+        IReadOnlyDictionary<int, List<UtcSlot>> perResourceAvailability)
     {
         var slots = new List<UtcSlot>();
         for (var i = 0; i < groupResourceIds.Count; i++)
         {
-            var resourceId = groupResourceIds[i];
-            var query = new AvailabilityQuery(period, new List<int> { resourceId });
-            var result = _engine.Compute(query, inputs);
-            for (var s = 0; s < result.Slots.Count; s++)
+            if (!perResourceAvailability.TryGetValue(groupResourceIds[i], out var resourceSlots))
             {
-                var slot = result.Slots[s];
+                continue;
+            }
+
+            for (var s = 0; s < resourceSlots.Count; s++)
+            {
+                var slot = resourceSlots[s];
                 slots.Add(new UtcSlot(slot.StartUtc, slot.EndUtc, allResourceIds));
             }
         }
 
         return NormalizeSlots(slots);
+    }
+
+    private IReadOnlyDictionary<int, List<UtcSlot>> BuildPerResourceAvailability(
+        DatePeriod period,
+        IReadOnlyList<int> allResourceIds,
+        AvailabilityInputs inputs)
+    {
+        if (allResourceIds.Count == 0)
+        {
+            return new Dictionary<int, List<UtcSlot>>();
+        }
+
+        var query = new AvailabilityQuery(period, allResourceIds);
+        return _engine.ComputePerResourceAvailability(query, inputs);
     }
 
     private static List<UtcSlot> IntersectSlots(IReadOnlyList<UtcSlot> first, IReadOnlyList<UtcSlot> second)

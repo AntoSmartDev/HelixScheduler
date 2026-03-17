@@ -7,6 +7,12 @@ public interface IBusyEventRepository
         DateTime toUtc,
         IReadOnlyCollection<int> resourceIds,
         CancellationToken ct);
+
+    Task<IReadOnlyList<BusyEventComputeRow>> GetBusyForComputeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        IReadOnlyCollection<int> resourceIds,
+        CancellationToken ct);
 }
 
 public sealed record BusyEventRow(
@@ -16,4 +22,10 @@ public sealed record BusyEventRow(
     DateTime EndUtc,
     string? EventType,
     DateTime CreatedAtUtc,
+    IReadOnlyList<int> ResourceIds);
+
+public sealed record BusyEventComputeRow(
+    long Id,
+    DateTime StartUtc,
+    DateTime EndUtc,
     IReadOnlyList<int> ResourceIds);

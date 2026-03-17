@@ -315,6 +315,41 @@ public sealed class AvailabilityEngineV1Tests
         Assert.Equal(new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc), result.Slots[0].EndUtc);
     }
 
+    [Fact]
+    public void ComposeAvailability_Matches_Full_Compute_Result()
+    {
+        var engine = new AvailabilityEngineV1();
+        var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
+        var requiredId = 9;
+        var resourceA = 1;
+        var resourceB = 2;
+
+        var rules = new[]
+        {
+            SingleDateRule(1, requiredId, new DateOnly(2025, 3, 10), 9, 11),
+            SingleDateRule(2, resourceA, new DateOnly(2025, 3, 10), 8, 10),
+            SingleDateRule(3, resourceB, new DateOnly(2025, 3, 10), 10, 12)
+        };
+
+        var query = new AvailabilityQuery(
+            period,
+            new[] { requiredId },
+            resourceOrGroups: new[] { new[] { resourceA, resourceB } });
+        var inputs = new AvailabilityInputs(rules, Array.Empty<BusySlotModel>());
+
+        var result = engine.Compute(query, inputs);
+        var perResource = engine.ComputePerResourceAvailability(query, inputs);
+        var recomposed = engine.ComposeAvailability(query, perResource);
+
+        Assert.Equal(result.Slots.Count, recomposed.Slots.Count);
+        for (var i = 0; i < result.Slots.Count; i++)
+        {
+            Assert.Equal(result.Slots[i].StartUtc, recomposed.Slots[i].StartUtc);
+            Assert.Equal(result.Slots[i].EndUtc, recomposed.Slots[i].EndUtc);
+            Assert.Equal(result.Slots[i].ResourceIds.ToArray(), recomposed.Slots[i].ResourceIds.ToArray());
+        }
+    }
+
     private static RuleModel WeeklyRule(long id, int resourceId, params DayOfWeek[] days)
     {
         return new RuleModel(

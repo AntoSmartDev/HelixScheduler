@@ -5,53 +5,49 @@ namespace HelixScheduler.Core;
 /// </summary>
 public sealed class AvailabilityEngineV1
 {
-    /// <summary>
-    /// Computes availability by intersecting per-resource availability and OR groups.
-    /// </summary>
-    /// <param name="query">Availability query (UTC period, resource selection).</param>
-    /// <param name="inputs">Normalized rules, busy slots, and capacities (UTC).</param>
-    public AvailabilityResult Compute(AvailabilityQuery query, AvailabilityInputs inputs)
+    public IReadOnlyDictionary<int, List<UtcSlot>> ComputePerResourceAvailability(
+        AvailabilityQuery query,
+        AvailabilityInputs inputs)
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
         if (inputs == null) throw new ArgumentNullException(nameof(inputs));
 
         if (query.RequiredResourceIds.Count == 0)
         {
-            return new AvailabilityResult(Array.Empty<UtcSlot>());
+            return new Dictionary<int, List<UtcSlot>>();
         }
 
-        var requiredIds = query.RequiredResourceIds.ToArray();
         var allResourceIds = query.AllResourceIds.Count > 0
             ? query.AllResourceIds.ToArray()
-            : requiredIds;
+            : query.RequiredResourceIds.ToArray();
         var perResource = new Dictionary<int, List<UtcSlot>>(allResourceIds.Length);
+        var rulesByResource = GroupRulesByResource(inputs.Rules);
+        var busyByResource = GroupBusyByResource(inputs.BusySlots);
 
         foreach (var resourceId in allResourceIds)
         {
             var positive = new List<UtcSlot>();
             var negative = new List<UtcSlot>();
 
-            for (var i = 0; i < inputs.Rules.Count; i++)
+            if (rulesByResource.TryGetValue(resourceId, out var resourceRules))
             {
-                var rule = inputs.Rules[i];
-                if (rule.ResourceId != resourceId)
+                for (var i = 0; i < resourceRules.Count; i++)
                 {
-                    continue;
-                }
+                    var rule = resourceRules[i];
+                    var occurrences = GenerateOccurrences(rule, query.Period);
+                    if (occurrences.Count == 0)
+                    {
+                        continue;
+                    }
 
-                var occurrences = GenerateOccurrences(rule, query.Period);
-                if (occurrences.Count == 0)
-                {
-                    continue;
-                }
-
-                if (rule.IsExclude)
-                {
-                    negative.AddRange(occurrences);
-                }
-                else
-                {
-                    positive.AddRange(occurrences);
+                    if (rule.IsExclude)
+                    {
+                        negative.AddRange(occurrences);
+                    }
+                    else
+                    {
+                        positive.AddRange(occurrences);
+                    }
                 }
             }
 
@@ -62,36 +58,65 @@ public sealed class AvailabilityEngineV1
             }
 
             var capacity = ResolveCapacity(inputs.ResourceCapacities, resourceId);
-            if (capacity <= 1)
+            if (busyByResource.TryGetValue(resourceId, out var resourceBusy))
             {
-                for (var i = 0; i < inputs.BusySlots.Count; i++)
+                if (capacity <= 1)
                 {
-                    var busy = inputs.BusySlots[i];
-                    if (busy.ResourceId == resourceId)
+                    for (var i = 0; i < resourceBusy.Count; i++)
                     {
+                        var busy = resourceBusy[i];
                         negative.Add(new UtcSlot(busy.StartUtc, busy.EndUtc, new[] { resourceId }));
                     }
                 }
-            }
-            else
-            {
-                var capacityBlocks = BuildCapacityBlocks(inputs.BusySlots, resourceId, capacity);
-                if (capacityBlocks.Count > 0)
+                else
                 {
-                    negative.AddRange(capacityBlocks);
+                    var capacityBlocks = BuildCapacityBlocks(resourceBusy, resourceId, capacity);
+                    if (capacityBlocks.Count > 0)
+                    {
+                        negative.AddRange(capacityBlocks);
+                    }
                 }
             }
 
             var normalizedPositive = NormalizeSlots(positive);
             var normalizedNegative = NormalizeSlots(negative);
-            var available = SubtractSlots(normalizedPositive, normalizedNegative);
-            perResource[resourceId] = available;
+            perResource[resourceId] = SubtractSlots(normalizedPositive, normalizedNegative);
         }
 
-        var intersection = perResource[requiredIds[0]];
+        return perResource;
+    }
+
+    public AvailabilityResult ComposeAvailability(
+        AvailabilityQuery query,
+        IReadOnlyDictionary<int, List<UtcSlot>> perResource)
+    {
+        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (perResource == null) throw new ArgumentNullException(nameof(perResource));
+
+        if (query.RequiredResourceIds.Count == 0)
+        {
+            return new AvailabilityResult(Array.Empty<UtcSlot>());
+        }
+
+        var requiredIds = query.RequiredResourceIds.ToArray();
+        var allResourceIds = query.AllResourceIds.Count > 0
+            ? query.AllResourceIds.ToArray()
+            : requiredIds;
+
+        if (!perResource.TryGetValue(requiredIds[0], out var first))
+        {
+            return new AvailabilityResult(Array.Empty<UtcSlot>());
+        }
+
+        var intersection = first;
         for (var index = 1; index < requiredIds.Length; index++)
         {
-            intersection = IntersectSlots(intersection, perResource[requiredIds[index]]);
+            if (!perResource.TryGetValue(requiredIds[index], out var resourceSlots))
+            {
+                return new AvailabilityResult(Array.Empty<UtcSlot>());
+            }
+
+            intersection = IntersectSlots(intersection, resourceSlots);
             if (intersection.Count == 0)
             {
                 break;
@@ -129,6 +154,20 @@ public sealed class AvailabilityEngineV1
 
         resultSlots = NormalizeSlots(resultSlots);
         return new AvailabilityResult(resultSlots);
+    }
+
+    /// <summary>
+    /// Computes availability by intersecting per-resource availability and OR groups.
+    /// </summary>
+    /// <param name="query">Availability query (UTC period, resource selection).</param>
+    /// <param name="inputs">Normalized rules, busy slots, and capacities (UTC).</param>
+    public AvailabilityResult Compute(AvailabilityQuery query, AvailabilityInputs inputs)
+    {
+        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (inputs == null) throw new ArgumentNullException(nameof(inputs));
+
+        var perResource = ComputePerResourceAvailability(query, inputs);
+        return ComposeAvailability(query, perResource);
     }
 
     private static List<UtcSlot> GenerateOccurrences(RuleModel rule, DatePeriod period)
@@ -228,58 +267,52 @@ public sealed class AvailabilityEngineV1
         }
 
         var result = new List<UtcSlot>(available.Count);
-        var orderedBlocks = blocks;
-
-        var segments = new List<UtcSlot>(1);
-        var nextSegments = new List<UtcSlot>(2);
+        var blockIndex = 0;
 
         for (var i = 0; i < available.Count; i++)
         {
-            segments.Clear();
-            segments.Add(available[i]);
+            var slot = available[i];
 
-            for (var b = 0; b < orderedBlocks.Count; b++)
+            while (blockIndex < blocks.Count && blocks[blockIndex].EndUtc <= slot.StartUtc)
             {
-                if (segments.Count == 0)
+                blockIndex++;
+            }
+
+            var currentStart = slot.StartUtc;
+            var scanIndex = blockIndex;
+
+            while (scanIndex < blocks.Count)
+            {
+                var block = blocks[scanIndex];
+                if (block.StartUtc >= slot.EndUtc)
                 {
                     break;
                 }
 
-                nextSegments.Clear();
-                var block = orderedBlocks[b];
-                for (var s = 0; s < segments.Count; s++)
+                if (block.EndUtc <= currentStart)
                 {
-                    var segment = segments[s];
-                    if (block.EndUtc <= segment.StartUtc || block.StartUtc >= segment.EndUtc)
-                    {
-                        nextSegments.Add(segment);
-                        continue;
-                    }
-
-                    if (block.StartUtc <= segment.StartUtc && block.EndUtc >= segment.EndUtc)
-                    {
-                        continue;
-                    }
-
-                    if (block.StartUtc > segment.StartUtc)
-                    {
-                        nextSegments.Add(new UtcSlot(segment.StartUtc, block.StartUtc, segment.ResourceIds));
-                    }
-
-                    if (block.EndUtc < segment.EndUtc)
-                    {
-                        nextSegments.Add(new UtcSlot(block.EndUtc, segment.EndUtc, segment.ResourceIds));
-                    }
+                    scanIndex++;
+                    continue;
                 }
 
-                var swap = segments;
-                segments = nextSegments;
-                nextSegments = swap;
+                if (block.StartUtc > currentStart)
+                {
+                    result.Add(new UtcSlot(currentStart, block.StartUtc, slot.ResourceIds));
+                }
+
+                if (block.EndUtc >= slot.EndUtc)
+                {
+                    currentStart = slot.EndUtc;
+                    break;
+                }
+
+                currentStart = block.EndUtc;
+                scanIndex++;
             }
 
-            for (var s = 0; s < segments.Count; s++)
+            if (currentStart < slot.EndUtc)
             {
-                result.Add(segments[s]);
+                result.Add(new UtcSlot(currentStart, slot.EndUtc, slot.ResourceIds));
             }
         }
 
@@ -452,11 +485,6 @@ public sealed class AvailabilityEngineV1
         for (var i = 0; i < busySlots.Count; i++)
         {
             var busy = busySlots[i];
-            if (busy.ResourceId != resourceId)
-            {
-                continue;
-            }
-
             edges.Add(new BusyEdge(busy.StartUtc, 1));
             edges.Add(new BusyEdge(busy.EndUtc, -1));
         }
@@ -499,6 +527,42 @@ public sealed class AvailabilityEngineV1
         }
 
         return blocks;
+    }
+
+    private static Dictionary<int, List<RuleModel>> GroupRulesByResource(IReadOnlyList<RuleModel> rules)
+    {
+        var grouped = new Dictionary<int, List<RuleModel>>();
+        for (var i = 0; i < rules.Count; i++)
+        {
+            var rule = rules[i];
+            if (!grouped.TryGetValue(rule.ResourceId, out var resourceRules))
+            {
+                resourceRules = new List<RuleModel>();
+                grouped[rule.ResourceId] = resourceRules;
+            }
+
+            resourceRules.Add(rule);
+        }
+
+        return grouped;
+    }
+
+    private static Dictionary<int, List<BusySlotModel>> GroupBusyByResource(IReadOnlyList<BusySlotModel> busySlots)
+    {
+        var grouped = new Dictionary<int, List<BusySlotModel>>();
+        for (var i = 0; i < busySlots.Count; i++)
+        {
+            var busy = busySlots[i];
+            if (!grouped.TryGetValue(busy.ResourceId, out var resourceBusy))
+            {
+                resourceBusy = new List<BusySlotModel>();
+                grouped[busy.ResourceId] = resourceBusy;
+            }
+
+            resourceBusy.Add(busy);
+        }
+
+        return grouped;
     }
 
     private readonly struct BusyEdge

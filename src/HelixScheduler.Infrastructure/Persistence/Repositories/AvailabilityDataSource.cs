@@ -33,7 +33,7 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         CancellationToken ct)
     {
         var rules = await _ruleRepository
-            .GetRulesAsync(fromDateUtc, toDateUtc, resourceIds, ct)
+            .GetRulesForComputeAsync(fromDateUtc, toDateUtc, resourceIds, ct)
             .ConfigureAwait(false);
 
         var result = new List<RuleData>(rules.Count);
@@ -72,7 +72,7 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         CancellationToken ct)
     {
         var busyEvents = await _busyEventRepository
-            .GetBusyAsync(fromUtc, toUtcExclusive, resourceIds, ct)
+            .GetBusyForComputeAsync(fromUtc, toUtcExclusive, resourceIds, ct)
             .ConfigureAwait(false);
 
         var result = new List<BusyEventData>(busyEvents.Count);
