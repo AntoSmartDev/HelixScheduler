@@ -89,6 +89,48 @@ public sealed class AvailabilityControllerTests : IClassFixture<CustomWebApplica
     }
 
     [Fact]
+    public async Task PropertyFilterGroups_Empty_PropertyIds_Returns_BadRequest()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-01-06",
+            toDate = "2026-01-06",
+            requiredResourceIds = new[] { 1 },
+            propertyFilterGroups = new[]
+            {
+                new
+                {
+                    propertyIds = Array.Empty<int>(),
+                    matchMode = "or"
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_Invalid_MatchMode_Returns_BadRequest()
+    {
+        var response = await _client.PostAsJsonAsync("/api/availability/compute", new
+        {
+            fromDate = "2026-01-06",
+            toDate = "2026-01-06",
+            requiredResourceIds = new[] { 1 },
+            propertyFilterGroups = new[]
+            {
+                new
+                {
+                    propertyIds = new[] { 101 },
+                    matchMode = "xor"
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Returns_Slots_With_Expected_Shape()
     {
         var response = await _client.GetAsync("/api/availability/slots?fromDate=2025-03-10&toDate=2025-03-10&resourceIds=7,1");

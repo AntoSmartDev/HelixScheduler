@@ -280,11 +280,21 @@ function addRequirement() {
     typeId: null,
     resourceId: null,
     definitionId: null,
-    nodeId: null,
-    includeDescendants: false,
-    filters: [],
+    propertyGroups: [createPropertyGroup()],
   });
   renderRequirements();
+}
+
+function createPropertyGroup() {
+  return {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    matchMode: "and",
+    includeDescendants: false,
+    nodeId: null,
+    filters: [],
+    message: "",
+    messageTimer: null
+  };
 }
 
 function resetBuilder() {
@@ -368,14 +378,14 @@ function renderRequirements() {
     note.className = "microcopy";
     note.textContent = "Properties are defined per resource type.";
     grid.appendChild(note);
-    grid.appendChild(buildPropertyFilterRow(req));
+    grid.appendChild(buildPropertyGroups(req));
 
     card.appendChild(grid);
-    card.appendChild(buildFilterChips(req));
     card.appendChild(buildCandidatePreview(req));
     requirementsEl.appendChild(card);
   });
 
+  window.DemoInfoPopovers?.bindAll?.(requirementsEl);
   renderPayloadPreview(buildSearchPayload().payload);
 }
 
@@ -414,8 +424,7 @@ function buildTypeSelect(req) {
     req.typeId = select.value ? Number(select.value) : null;
     req.resourceId = null;
     req.definitionId = null;
-    req.nodeId = null;
-    req.filters = [];
+    req.propertyGroups = [createPropertyGroup()];
     renderRequirements();
   });
 
@@ -474,14 +483,107 @@ function buildDefinitionSelect(req) {
 
   select.addEventListener("change", () => {
     req.definitionId = select.value ? Number(select.value) : null;
-    req.nodeId = null;
+    req.propertyGroups = [createPropertyGroup()];
     renderRequirements();
   });
 
   return select;
 }
 
-function buildPropertyFilterRow(req) {
+function buildPropertyGroups(req) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "property-groups";
+
+  req.propertyGroups.forEach((group, index) => {
+    const groupCard = document.createElement("div");
+    groupCard.className = "property-group";
+
+    const header = document.createElement("div");
+    header.className = "group-header";
+    header.appendChild(createElement("strong", null, `Group ${index + 1}`));
+
+    if (req.propertyGroups.length > 1) {
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn ghost small";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        req.propertyGroups = req.propertyGroups.filter(item => item.id !== group.id);
+        renderRequirements();
+      });
+      header.appendChild(removeBtn);
+    }
+    groupCard.appendChild(header);
+
+    const modeRow = document.createElement("div");
+    modeRow.className = "input-row";
+    const modeLabel = document.createElement("label");
+    modeLabel.textContent = "Match mode";
+    const modeInfo = createElement("span", "info-icon", "i");
+    modeInfo.setAttribute("data-tooltip", "AND = all properties must match. OR = any property matches.");
+    window.DemoInfoPopovers?.bindIcon?.(modeInfo);
+    modeLabel.appendChild(document.createTextNode(" "));
+    modeLabel.appendChild(modeInfo);
+    const modeSelect = document.createElement("select");
+    modeSelect.className = "property-select";
+    modeSelect.innerHTML = "<option value=\"and\">and</option><option value=\"or\">or</option>";
+    modeSelect.value = group.matchMode;
+    modeSelect.addEventListener("change", () => {
+      group.matchMode = modeSelect.value;
+      clearGroupMessage(group);
+      renderRequirements();
+    });
+    modeRow.appendChild(modeLabel);
+    modeRow.appendChild(modeSelect);
+    groupCard.appendChild(modeRow);
+
+    const includeLabel = document.createElement("label");
+    includeLabel.className = "toggle";
+    const includeToggle = document.createElement("input");
+    includeToggle.type = "checkbox";
+    includeToggle.checked = group.includeDescendants;
+    includeToggle.addEventListener("change", () => {
+      group.includeDescendants = includeToggle.checked;
+      if (group.includeDescendants) {
+        normalizeGroupDescendants(group);
+      }
+      clearGroupMessage(group);
+      renderRequirements();
+    });
+    includeLabel.appendChild(includeToggle);
+    const includeText = document.createElement("span");
+    includeText.textContent = "Include property descendants";
+    const includeInfo = createElement("span", "info-icon", "i");
+    includeInfo.setAttribute("data-tooltip", "When enabled, child properties in the hierarchy are included in the filter.");
+    window.DemoInfoPopovers?.bindIcon?.(includeInfo);
+    includeText.appendChild(document.createTextNode(" "));
+    includeText.appendChild(includeInfo);
+    includeLabel.appendChild(includeText);
+    groupCard.appendChild(includeLabel);
+
+    groupCard.appendChild(buildPropertyFilterRow(req, group));
+    groupCard.appendChild(buildGroupChips(group));
+    if (group.message) {
+      const message = document.createElement("div");
+      message.className = "group-message";
+      message.textContent = group.message;
+      groupCard.appendChild(message);
+    }
+    wrapper.appendChild(groupCard);
+  });
+
+  const addGroupBtn = document.createElement("button");
+  addGroupBtn.className = "btn small";
+  addGroupBtn.textContent = "+ Add group";
+  addGroupBtn.addEventListener("click", () => {
+    req.propertyGroups.push(createPropertyGroup());
+    renderRequirements();
+  });
+  wrapper.appendChild(addGroupBtn);
+
+  return wrapper;
+}
+
+function buildPropertyFilterRow(req, group) {
   const wrapper = document.createElement("div");
   wrapper.className = "property-filter-row";
   const nodeSelect = document.createElement("select");
@@ -489,53 +591,41 @@ function buildPropertyFilterRow(req) {
   nodeSelect.innerHTML = "<option value=\"\">Select property</option>";
 
   if (req.definitionId) {
-    appendPropertyTreeOptions(nodeSelect, req.definitionId, req.nodeId);
+    appendPropertyTreeOptions(nodeSelect, req.definitionId, group.nodeId);
   }
 
   nodeSelect.addEventListener("change", () => {
     const nodeId = nodeSelect.value ? Number(nodeSelect.value) : null;
-    if (!nodeId) {
-      req.nodeId = null;
+    group.nodeId = nodeId || null;
+    if (!group.nodeId) {
       return;
     }
-
-    req.filters.push({
-      propertyId: nodeId,
-      includeDescendants: req.includeDescendants
-    });
-    req.nodeId = null;
+    const message = addPropertyFilter(group, group.nodeId);
+    if (!message) {
+      group.nodeId = null;
+      clearGroupMessage(group);
+      renderRequirements();
+      return;
+    }
+    setGroupMessage(group, message);
     renderRequirements();
   });
-
-  const includeLabel = document.createElement("label");
-  includeLabel.className = "toggle";
-  const includeToggle = document.createElement("input");
-  includeToggle.type = "checkbox";
-  includeToggle.checked = req.includeDescendants;
-  includeToggle.addEventListener("change", () => {
-    req.includeDescendants = includeToggle.checked;
-  });
-  includeLabel.appendChild(includeToggle);
-  const includeText = document.createElement("span");
-  includeText.textContent = "Include property descendants";
-  const info = createElement("span", "info-icon", "i");
-  info.setAttribute("data-tooltip", "When enabled, child properties in the hierarchy are included in the filter.");
-  includeText.appendChild(document.createTextNode(" "));
-  includeText.appendChild(info);
-  includeLabel.appendChild(includeText);
 
   const addBtn = document.createElement("button");
   addBtn.className = "btn small";
   addBtn.textContent = "Add filter";
   addBtn.addEventListener("click", () => {
-    if (!req.nodeId) {
+    if (!group.nodeId) {
       return;
     }
-    req.filters.push({
-      propertyId: req.nodeId,
-      includeDescendants: req.includeDescendants
-    });
-    req.nodeId = null;
+    const message = addPropertyFilter(group, group.nodeId);
+    if (!message) {
+      group.nodeId = null;
+      clearGroupMessage(group);
+      renderRequirements();
+      return;
+    }
+    setGroupMessage(group, message);
     renderRequirements();
   });
 
@@ -544,33 +634,87 @@ function buildPropertyFilterRow(req) {
   row.appendChild(nodeSelect);
   row.appendChild(addBtn);
   wrapper.appendChild(row);
-  wrapper.appendChild(includeLabel);
   return wrapper;
 }
 
-function buildFilterChips(req) {
+function addPropertyFilter(group, propertyId) {
+  if (group.filters.includes(propertyId)) {
+    return "Property already added to this group.";
+  }
+
+  if (group.includeDescendants) {
+    const blockedByAncestor = group.filters.some(filterId => isDescendantOf(propertyId, filterId));
+    if (blockedByAncestor) {
+      return "Already covered by an ancestor with descendants enabled.";
+    }
+
+    group.filters = group.filters.filter(filterId => !isDescendantOf(filterId, propertyId));
+  }
+
+  group.filters.push(propertyId);
+  return "";
+}
+
+function normalizeGroupDescendants(group) {
+  if (!group.includeDescendants || group.filters.length < 2) {
+    return;
+  }
+
+  const kept = [];
+  for (let i = 0; i < group.filters.length; i++) {
+    const current = group.filters[i];
+    const hasAncestor = group.filters.some(filterId => filterId !== current && isDescendantOf(current, filterId));
+    if (!hasAncestor) {
+      kept.push(current);
+    }
+  }
+  group.filters = kept;
+}
+
+function buildGroupChips(group) {
   const chips = document.createElement("div");
   chips.className = "chip-list";
-  if (req.filters.length === 0) {
+  if (group.filters.length === 0) {
     chips.textContent = "No property filters.";
     return chips;
   }
 
-  req.filters.forEach((filter, index) => {
+  group.filters.forEach((propertyId, index) => {
     const chip = document.createElement("span");
     chip.className = "chip";
-    chip.textContent = formatFilterLabel(filter);
+    chip.textContent = formatPropertyLabel(propertyId);
     const remove = document.createElement("button");
     remove.className = "btn ghost small";
     remove.textContent = "x";
     remove.addEventListener("click", () => {
-      req.filters.splice(index, 1);
+      group.filters.splice(index, 1);
       renderRequirements();
     });
     chip.appendChild(remove);
     chips.appendChild(chip);
   });
   return chips;
+}
+
+function setGroupMessage(group, message) {
+  if (group.messageTimer) {
+    clearTimeout(group.messageTimer);
+    group.messageTimer = null;
+  }
+  group.message = message;
+  group.messageTimer = setTimeout(() => {
+    group.message = "";
+    group.messageTimer = null;
+    renderRequirements();
+  }, 3000);
+}
+
+function clearGroupMessage(group) {
+  if (group.messageTimer) {
+    clearTimeout(group.messageTimer);
+    group.messageTimer = null;
+  }
+  group.message = "";
 }
 
 function buildCandidatePreview(req) {
@@ -601,11 +745,30 @@ function getMatchingResources(req) {
     return picked ? [picked] : [];
   }
 
-  req.filters.forEach(filter => {
-    const allowed = new Set(expandPropertyIds(filter.propertyId, filter.includeDescendants));
-    candidates = candidates.filter(resource => {
-      const props = resource.properties || [];
-      return props.some(prop => allowed.has(prop.id));
+  const groups = req.propertyGroups || [];
+  groups.forEach(group => {
+    if (!group.filters || group.filters.length === 0) {
+      return;
+    }
+
+    if (group.matchMode === "or") {
+      const allowed = new Set();
+      group.filters.forEach(propertyId => {
+        expandPropertyIds(propertyId, group.includeDescendants).forEach(id => allowed.add(id));
+      });
+      candidates = candidates.filter(resource => {
+        const props = resource.properties || [];
+        return props.some(prop => allowed.has(prop.id));
+      });
+      return;
+    }
+
+    group.filters.forEach(propertyId => {
+      const allowed = new Set(expandPropertyIds(propertyId, group.includeDescendants));
+      candidates = candidates.filter(resource => {
+        const props = resource.properties || [];
+        return props.some(prop => allowed.has(prop.id));
+      });
     });
   });
 
@@ -629,15 +792,14 @@ function expandPropertyIds(propertyId, includeDescendants) {
   return result;
 }
 
-function formatFilterLabel(filter) {
-  const node = state.propertyMap.get(filter.propertyId);
+function formatPropertyLabel(propertyId) {
+  const node = state.propertyMap.get(propertyId);
   if (!node) {
-    return `#${filter.propertyId}`;
+    return `#${propertyId}`;
   }
   const definition = state.propertyDefinitions.get(node.definitionId);
   const prefix = definition ? `${definition.label}: ` : "";
-  const suffix = filter.includeDescendants ? " (include property descendants)" : "";
-  return `${prefix}${node.label}${suffix}`;
+  return `${prefix}${node.label}`;
 }
 
 async function computeSearch() {
@@ -738,7 +900,10 @@ async function loadBusySummary(resourceIds) {
 
   function formatSearchHealthSummary(requirements, payload) {
     const requirementCount = requirements.length;
-    const propertyFilterCount = requirements.reduce((total, req) => total + (req.filters?.length || 0), 0);
+    const propertyFilterCount = requirements.reduce((total, req) => {
+      const groups = req.propertyGroups || [];
+      return total + groups.reduce((groupTotal, group) => groupTotal + (group.filters?.length || 0), 0);
+    }, 0);
     const label = requirementCount === 0 ? "Incomplete" : "Ready";
     return `${label} · Requirements ${requirementCount} · Property filters ${propertyFilterCount}`;
   }
@@ -755,7 +920,7 @@ function buildSearchIntent(requirements) {
 
   const clauses = requirements.map(req => {
     const typeLabel = DemoFormat.formatTypeLabel(state.resourceTypes.find(t => t.id === req.typeId));
-    const filters = req.filters.map(formatFilterLabel).join(" AND ");
+    const filters = formatPropertyGroupsSummary(req);
     if (req.resourceId) {
       const resource = state.resourceMap.get(req.resourceId);
       const resourceLabel = resource ? DemoFormat.formatIdLabel(resource.name, resource.id) : `#${req.resourceId}`;
@@ -765,6 +930,31 @@ function buildSearchIntent(requirements) {
   });
 
   return `Looking for availability where ${clauses.join(" AND ")}.`;
+}
+
+function formatPropertyGroupsSummary(req) {
+  const groups = req.propertyGroups || [];
+  const formatted = groups
+    .filter(group => group.filters && group.filters.length > 0)
+    .map(group => formatPropertyGroupLabel(group))
+    .filter(Boolean);
+  return formatted.join(" AND ");
+}
+
+function formatPropertyGroupLabel(group) {
+  const labels = group.filters.map(propertyId => formatPropertyLabel(propertyId));
+  if (labels.length === 0) {
+    return "";
+  }
+  const joiner = group.matchMode === "or" ? " OR " : " AND ";
+  let text = labels.join(joiner);
+  if (labels.length > 1) {
+    text = `(${text})`;
+  }
+  if (group.includeDescendants) {
+    text += " (include descendants)";
+  }
+  return text;
 }
 
 function formatRelationTypesSummary(payload) {
@@ -1152,7 +1342,10 @@ function renderBusy(busyEvents) {
     }
 
     const requirementCount = requirements.length;
-    const propertyCount = requirements.reduce((total, req) => total + (req.filters?.length || 0), 0);
+    const propertyCount = requirements.reduce((total, req) => {
+      const groups = req.propertyGroups || [];
+      return total + groups.reduce((groupTotal, group) => groupTotal + (group.filters?.length || 0), 0);
+    }, 0);
     const reason = explanations?.[0]?.reason ?? null;
     const lines = [];
 

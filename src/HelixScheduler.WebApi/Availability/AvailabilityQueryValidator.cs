@@ -92,16 +92,17 @@ public sealed class AvailabilityQueryValidator
         }
 
         request = new AvailabilityComputeRequest(
-            input.FromDate,
-            input.ToDate,
-            resourceIds,
-            input.PropertyIds,
-            normalizedGroups,
-            input.IncludePropertyDescendants,
-            input.Explain,
-            input.IncludeResourceAncestors,
-            input.AncestorRelationTypes,
-            input.AncestorMode);
+            FromDate: input.FromDate,
+            ToDate: input.ToDate,
+            RequiredResourceIds: resourceIds,
+            PropertyIds: input.PropertyIds,
+            PropertyFilterGroups: null,
+            ResourceOrGroups: normalizedGroups,
+            IncludePropertyDescendants: input.IncludePropertyDescendants,
+            Explain: input.Explain,
+            IncludeResourceAncestors: input.IncludeResourceAncestors,
+            AncestorRelationTypes: input.AncestorRelationTypes,
+            AncestorMode: input.AncestorMode);
         return true;
     }
 

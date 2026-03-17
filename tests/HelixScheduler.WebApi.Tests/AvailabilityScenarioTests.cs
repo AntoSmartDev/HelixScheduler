@@ -183,6 +183,232 @@ public sealed class AvailabilityScenarioTests
     }
 
     [Fact]
+    public async Task PropertyFilterGroups_Or_Allows_Either_Specialization()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.OphthalmologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    MatchMode: "or")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.Doctor7Id,
+                    DemoAvailabilityDataSource.Doctor8Id,
+                    DemoAvailabilityDataSource.Doctor9Id
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.NotEmpty(result.Slots);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_And_Between_Groups_Reduces_To_SiteA()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.LocationMilanId, DemoPropertySchemaDataSource.LocationRomeId },
+                    MatchMode: "or"),
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.AccreditationIsoId },
+                    MatchMode: "and")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.SiteAId,
+                    DemoAvailabilityDataSource.SiteBId
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 14, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 15, 0, 0, DateTimeKind.Utc));
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 16, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 18, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_IncludeDescendants_Or_Matches_Imaging_Rooms()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    MatchMode: "or",
+                    IncludePropertyDescendants: true)
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.Room1Id,
+                    DemoAvailabilityDataSource.Room2Id,
+                    DemoAvailabilityDataSource.Room3Id,
+                    DemoAvailabilityDataSource.Room4Id
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.NotEmpty(result.Slots);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_Duplicates_Do_Not_Change_Result()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.CardiologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    MatchMode: "or")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.Doctor8Id,
+                    DemoAvailabilityDataSource.Doctor9Id
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.NotEmpty(result.Slots);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_Or_With_Descendants_Union_Matches_Rooms()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.ImagingRootId, DemoPropertySchemaDataSource.OctId },
+                    MatchMode: "or",
+                    IncludePropertyDescendants: true)
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.Room1Id,
+                    DemoAvailabilityDataSource.Room2Id,
+                    DemoAvailabilityDataSource.Room3Id,
+                    DemoAvailabilityDataSource.Room4Id
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.NotEmpty(result.Slots);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_And_Within_Group_Requires_All_Properties()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.OphthalmologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    MatchMode: "and")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.Doctor7Id,
+                    DemoAvailabilityDataSource.Doctor8Id,
+                    DemoAvailabilityDataSource.Doctor9Id
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.Empty(result.Slots);
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_Take_Priority_Over_Legacy_PropertyIds()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyIds: new[] { DemoPropertySchemaDataSource.LocationRomeId },
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.LocationMilanId },
+                    MatchMode: "and")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityDataSource.SiteAId,
+                    DemoAvailabilityDataSource.SiteBId
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 14, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 15, 0, 0, DateTimeKind.Utc));
+        Assert.Contains(result.Slots, slot =>
+            slot.StartUtc == new DateTime(2026, 1, 12, 16, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 18, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public async Task PropertyFilterGroups_Invalid_MatchMode_Throws()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.OphthalmologyId },
+                    MatchMode: "xor")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[] { DemoAvailabilityDataSource.Doctor7Id }
+            });
+
+        await Assert.ThrowsAsync<AvailabilityRequestException>(() =>
+            _service.ComputeAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SlotDuration_Emits_Remainder_When_Enabled()
     {
         var request = new AvailabilityComputeRequest(

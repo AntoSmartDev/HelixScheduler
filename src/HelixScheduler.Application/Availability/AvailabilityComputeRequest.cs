@@ -5,6 +5,7 @@ public sealed record AvailabilityComputeRequest(
     DateOnly ToDate,
     IReadOnlyList<int> RequiredResourceIds,
     IReadOnlyList<int>? PropertyIds = null,
+    IReadOnlyList<PropertyFilterGroup>? PropertyFilterGroups = null,
     IReadOnlyList<IReadOnlyList<int>>? ResourceOrGroups = null,
     bool IncludePropertyDescendants = false,
     bool Explain = false,

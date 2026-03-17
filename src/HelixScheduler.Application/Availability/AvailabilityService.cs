@@ -10,6 +10,8 @@ public sealed class AvailabilityService : IAvailabilityService
     private const int MaxOrGroupItems = 10;
     private const int MaxTotalResources = 20;
     private const int MaxAncestorFilters = 5;
+    private const int MaxPropertyFilterGroups = 5;
+    private const int MaxPropertyFilterIdsPerGroup = 10;
 
     private readonly IAvailabilityDataSource _dataSource;
     private readonly PropertySchema.IPropertySchemaService _propertySchemaService;
@@ -60,7 +62,8 @@ public sealed class AvailabilityService : IAvailabilityService
         AvailabilityComputeRequest request,
         CancellationToken ct)
     {
-        if (request.PropertyIds == null || request.PropertyIds.Count == 0)
+        var propertyIds = CollectPropertyFilterIds(request);
+        if (propertyIds.Count == 0)
         {
             return;
         }
@@ -78,7 +81,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
         await _propertySchemaService.ValidatePropertyFiltersAsync(
             resourceIds.ToList(),
-            request.PropertyIds,
+            propertyIds,
             ct).ConfigureAwait(false);
     }
 
@@ -139,6 +142,43 @@ public sealed class AvailabilityService : IAvailabilityService
         if (request.PropertyIds != null && request.PropertyIds.Count > 0 && HasNonPositive(request.PropertyIds))
         {
             throw new AvailabilityRequestException("propertyIds must contain only positive integers.");
+        }
+
+        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
+        {
+            if (request.PropertyFilterGroups.Count > MaxPropertyFilterGroups)
+            {
+                throw new AvailabilityRequestException("propertyFilterGroups must contain at most 5 groups.");
+            }
+
+            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
+            {
+                var group = request.PropertyFilterGroups[i];
+                if (group == null)
+                {
+                    throw new AvailabilityRequestException("propertyFilterGroups cannot contain null entries.");
+                }
+
+                if (group.PropertyIds == null || group.PropertyIds.Count == 0)
+                {
+                    throw new AvailabilityRequestException("propertyFilterGroups requires propertyIds.");
+                }
+
+                if (HasNonPositive(group.PropertyIds))
+                {
+                    throw new AvailabilityRequestException("propertyFilterGroups propertyIds must be positive integers.");
+                }
+
+                if (group.PropertyIds.Count > MaxPropertyFilterIdsPerGroup)
+                {
+                    throw new AvailabilityRequestException("propertyFilterGroups propertyIds must contain at most 10 items.");
+                }
+
+                if (NormalizePropertyMatchMode(group.MatchMode) == null)
+                {
+                    throw new AvailabilityRequestException("propertyFilterGroups matchMode must be 'or' or 'and'.");
+                }
+            }
         }
 
         var orGroups = request.ResourceOrGroups ?? Array.Empty<IReadOnlyList<int>>();
@@ -271,47 +311,34 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         HashSet<int>? propertyFiltered = null;
-        var propertyIds = request.PropertyIds?.Distinct().ToList() ?? new List<int>();
-        if (propertyIds.Count > 0)
+        var propertyGroups = NormalizePropertyFilterGroups(request);
+        if (propertyGroups.Count > 0)
         {
-            if (!request.IncludePropertyDescendants && propertyIds.Count > 1)
+            var expansionCache = new Dictionary<int, IReadOnlyList<int>>();
+            for (var i = 0; i < propertyGroups.Count; i++)
             {
-                var resourceMatches = await _dataSource
-                    .GetResourceIdsByAllPropertiesAsync(propertyIds, ct)
-                    .ConfigureAwait(false);
-                propertyFiltered = new HashSet<int>(resourceMatches);
-            }
-            else
-            {
-                foreach (var propertyId in propertyIds)
+                var groupMatch = await EvaluatePropertyFilterGroupAsync(
+                    propertyGroups[i],
+                    expansionCache,
+                    ct).ConfigureAwait(false);
+
+                if (groupMatch.Count == 0)
                 {
-                    var effectivePropertyIds = request.IncludePropertyDescendants
-                        ? await ExpandPropertyIdsAsync(propertyId, ct).ConfigureAwait(false)
-                        : new List<int> { propertyId };
+                    return AvailabilityComputation.Empty();
+                }
 
-                    var resourceMatches = await _dataSource
-                        .GetResourceIdsByPropertiesAsync(effectivePropertyIds, ct)
-                        .ConfigureAwait(false);
-
-                    var matchSet = new HashSet<int>(resourceMatches);
-                    if (propertyFiltered == null)
+                if (propertyFiltered == null)
+                {
+                    propertyFiltered = groupMatch;
+                }
+                else
+                {
+                    propertyFiltered.IntersectWith(groupMatch);
+                    if (propertyFiltered.Count == 0)
                     {
-                        propertyFiltered = matchSet;
-                    }
-                    else
-                    {
-                        propertyFiltered.IntersectWith(matchSet);
-                        if (propertyFiltered.Count == 0)
-                        {
-                            return AvailabilityComputation.Empty();
-                        }
+                        return AvailabilityComputation.Empty();
                     }
                 }
-            }
-
-            if (propertyFiltered == null)
-            {
-                return AvailabilityComputation.Empty();
             }
 
             filteredResourceIds.IntersectWith(propertyFiltered);
@@ -513,6 +540,232 @@ public sealed class AvailabilityService : IAvailabilityService
         var resultWithRequired = _engine.Compute(queryWithRequired, inputs);
 
         return new AvailabilityComputation(resultWithRequired, hasPositive, hasNegative, busySlots.Count > 0);
+    }
+
+    private static List<int> CollectPropertyFilterIds(AvailabilityComputeRequest request)
+    {
+        var ids = new List<int>();
+        var seen = new HashSet<int>();
+
+        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
+        {
+            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
+            {
+                var group = request.PropertyFilterGroups[i];
+                if (group?.PropertyIds == null)
+                {
+                    continue;
+                }
+
+                var groupIds = group.PropertyIds;
+                for (var j = 0; j < groupIds.Count; j++)
+                {
+                    var value = groupIds[j];
+                    if (seen.Add(value))
+                    {
+                        ids.Add(value);
+                    }
+                }
+            }
+
+            return ids;
+        }
+
+        if (request.PropertyIds == null)
+        {
+            return ids;
+        }
+
+        for (var i = 0; i < request.PropertyIds.Count; i++)
+        {
+            var value = request.PropertyIds[i];
+            if (seen.Add(value))
+            {
+                ids.Add(value);
+            }
+        }
+
+        return ids;
+    }
+
+    private static List<PropertyFilterGroup> NormalizePropertyFilterGroups(AvailabilityComputeRequest request)
+    {
+        var groups = new List<PropertyFilterGroup>();
+
+        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
+        {
+            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
+            {
+                var group = request.PropertyFilterGroups[i];
+                if (group?.PropertyIds == null || group.PropertyIds.Count == 0)
+                {
+                    continue;
+                }
+
+                var matchMode = NormalizePropertyMatchMode(group.MatchMode) ?? "and";
+                var ids = DistinctPropertyIds(group.PropertyIds);
+                if (ids.Count == 0)
+                {
+                    continue;
+                }
+
+                groups.Add(new PropertyFilterGroup(ids, matchMode, group.IncludePropertyDescendants));
+            }
+
+            return groups;
+        }
+
+        if (request.PropertyIds == null || request.PropertyIds.Count == 0)
+        {
+            return groups;
+        }
+
+        var legacyIds = DistinctPropertyIds(request.PropertyIds);
+        if (legacyIds.Count == 0)
+        {
+            return groups;
+        }
+
+        groups.Add(new PropertyFilterGroup(legacyIds, "and", request.IncludePropertyDescendants));
+        return groups;
+    }
+
+    private async Task<HashSet<int>> EvaluatePropertyFilterGroupAsync(
+        PropertyFilterGroup group,
+        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        CancellationToken ct)
+    {
+        var matchMode = NormalizePropertyMatchMode(group.MatchMode) ?? "and";
+        var propertyIds = group.PropertyIds;
+        if (propertyIds == null || propertyIds.Count == 0)
+        {
+            return new HashSet<int>();
+        }
+
+        if (matchMode == "or")
+        {
+            return await EvaluateOrPropertyGroupAsync(group, expansionCache, ct).ConfigureAwait(false);
+        }
+
+        return await EvaluateAndPropertyGroupAsync(group, expansionCache, ct).ConfigureAwait(false);
+    }
+
+    private async Task<HashSet<int>> EvaluateOrPropertyGroupAsync(
+        PropertyFilterGroup group,
+        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        CancellationToken ct)
+    {
+        if (!group.IncludePropertyDescendants)
+        {
+            var matches = await _dataSource
+                .GetResourceIdsByPropertiesAsync(group.PropertyIds, ct)
+                .ConfigureAwait(false);
+            return new HashSet<int>(matches);
+        }
+
+        var expandedIds = new HashSet<int>();
+        for (var i = 0; i < group.PropertyIds.Count; i++)
+        {
+            var propertyId = group.PropertyIds[i];
+            var expanded = await ExpandPropertyIdsCachedAsync(propertyId, expansionCache, ct)
+                .ConfigureAwait(false);
+            for (var j = 0; j < expanded.Count; j++)
+            {
+                expandedIds.Add(expanded[j]);
+            }
+        }
+
+        if (expandedIds.Count == 0)
+        {
+            return new HashSet<int>();
+        }
+
+        var resourceMatches = await _dataSource
+            .GetResourceIdsByPropertiesAsync(expandedIds.ToList(), ct)
+            .ConfigureAwait(false);
+        return new HashSet<int>(resourceMatches);
+    }
+
+    private async Task<HashSet<int>> EvaluateAndPropertyGroupAsync(
+        PropertyFilterGroup group,
+        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        CancellationToken ct)
+    {
+        if (!group.IncludePropertyDescendants && group.PropertyIds.Count > 1)
+        {
+            var resourceMatches = await _dataSource
+                .GetResourceIdsByAllPropertiesAsync(group.PropertyIds, ct)
+                .ConfigureAwait(false);
+            return new HashSet<int>(resourceMatches);
+        }
+
+        HashSet<int>? groupMatch = null;
+        for (var i = 0; i < group.PropertyIds.Count; i++)
+        {
+            var propertyId = group.PropertyIds[i];
+            IReadOnlyList<int> effectiveIds;
+            if (group.IncludePropertyDescendants)
+            {
+                effectiveIds = await ExpandPropertyIdsCachedAsync(propertyId, expansionCache, ct)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                effectiveIds = new List<int> { propertyId };
+            }
+
+            var resourceMatches = await _dataSource
+                .GetResourceIdsByPropertiesAsync(effectiveIds, ct)
+                .ConfigureAwait(false);
+            var matchSet = new HashSet<int>(resourceMatches);
+
+            if (groupMatch == null)
+            {
+                groupMatch = matchSet;
+            }
+            else
+            {
+                groupMatch.IntersectWith(matchSet);
+                if (groupMatch.Count == 0)
+                {
+                    return new HashSet<int>();
+                }
+            }
+        }
+
+        return groupMatch ?? new HashSet<int>();
+    }
+
+    private static List<int> DistinctPropertyIds(IReadOnlyList<int> propertyIds)
+    {
+        var distinct = new List<int>(propertyIds.Count);
+        var seen = new HashSet<int>();
+        for (var i = 0; i < propertyIds.Count; i++)
+        {
+            var value = propertyIds[i];
+            if (seen.Add(value))
+            {
+                distinct.Add(value);
+            }
+        }
+
+        distinct.Sort();
+        return distinct;
+    }
+
+    private async Task<IReadOnlyList<int>> ExpandPropertyIdsCachedAsync(
+        int propertyId,
+        IDictionary<int, IReadOnlyList<int>> cache,
+        CancellationToken ct)
+    {
+        if (cache.TryGetValue(propertyId, out var cached))
+        {
+            return cached;
+        }
+
+        var expanded = await ExpandPropertyIdsAsync(propertyId, ct).ConfigureAwait(false);
+        cache[propertyId] = expanded;
+        return expanded;
     }
 
     private static HashSet<int> CollectAncestors(
@@ -1131,6 +1384,20 @@ public sealed class AvailabilityService : IAvailabilityService
         if (string.IsNullOrWhiteSpace(mode))
         {
             return "or";
+        }
+
+        return mode.Equals("or", StringComparison.OrdinalIgnoreCase)
+            ? "or"
+            : mode.Equals("and", StringComparison.OrdinalIgnoreCase)
+                ? "and"
+                : null;
+    }
+
+    private static string? NormalizePropertyMatchMode(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            return "and";
         }
 
         return mode.Equals("or", StringComparison.OrdinalIgnoreCase)
