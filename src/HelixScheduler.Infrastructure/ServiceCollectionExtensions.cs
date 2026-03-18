@@ -7,6 +7,7 @@ using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Application.Startup;
 using HelixScheduler.Infrastructure.Diagnostics;
 using HelixScheduler.Infrastructure.Persistence;
+using HelixScheduler.Infrastructure.Persistence.QueryServices;
 using HelixScheduler.Infrastructure.Persistence.Repositories;
 using HelixScheduler.Infrastructure.Persistence.Seed;
 using HelixScheduler.Infrastructure.Startup;
@@ -45,11 +46,11 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantStore, TenantStore>();
-        services.AddScoped<IRuleRepository, RuleRepository>();
-        services.AddScoped<IBusyEventRepository, BusyEventRepository>();
         services.AddScoped<IPropertyRepository, PropertyRepository>();
-        services.AddScoped<IResourceRepository, ResourceRepository>();
-        services.AddScoped<IAvailabilityDataSource, AvailabilityDataSource>();
+        services.AddScoped<IAvailabilityComputeQueryService, AvailabilityComputeQueryService>();
+        services.AddScoped<IAvailabilityFilterQueryService, AvailabilityFilterQueryService>();
+        services.AddScoped<IAvailabilityAncestorQueryService, AvailabilityAncestorQueryService>();
+        services.AddScoped<IAvailabilitySummaryQueryService, AvailabilitySummaryQueryService>();
         services.AddScoped<IResourceCatalogDataSource, ResourceCatalogDataSource>();
         services.AddScoped<IResourceTypeCatalogDataSource, ResourceTypeCatalogDataSource>();
         services.AddScoped<IPropertySchemaDataSource, PropertySchemaDataSource>();
@@ -61,5 +62,3 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
-
-

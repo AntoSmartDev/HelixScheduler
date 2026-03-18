@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 
 namespace HelixScheduler.WebApi.Availability;
 
@@ -32,12 +32,6 @@ public sealed class AvailabilityQueryParser
             return false;
         }
 
-        if (!TryParseCsvInts(query.PropertyIds, out var propertyIds))
-        {
-            error = "propertyIds must be a comma-separated list of integers.";
-            return false;
-        }
-
         if (!TryParseOrGroups(query.OrGroups, out var orGroups, out var orGroupsError))
         {
             error = orGroupsError;
@@ -50,9 +44,7 @@ public sealed class AvailabilityQueryParser
             from,
             to,
             resourceIds,
-            propertyIds,
             orGroups,
-            query.IncludePropertyDescendants,
             query.Explain,
             query.IncludeResourceAncestors,
             relationTypes,
@@ -150,10 +142,10 @@ public sealed class AvailabilityQueryParser
             {
                 continue;
             }
+
             values.Add(parts[i]);
         }
 
         return true;
     }
 }
-

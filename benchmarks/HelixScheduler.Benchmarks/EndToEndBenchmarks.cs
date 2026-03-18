@@ -9,8 +9,9 @@ using HelixScheduler.Application.Availability;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Core;
 using HelixScheduler.Infrastructure.Persistence;
-using HelixScheduler.Infrastructure.Persistence.Repositories;
+using HelixScheduler.Infrastructure.Persistence.QueryServices;
 using HelixScheduler.Infrastructure.Persistence.Entities;
+using HelixScheduler.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 [MemoryDiagnoser]
@@ -37,19 +38,17 @@ public class EndToEndBenchmarks
         _dbContext.Database.EnsureCreated();
         SeedBenchmarkData();
 
-        var ruleRepository = new RuleRepository(_dbContext);
-        var busyRepository = new BusyEventRepository(_dbContext);
-        var propertyRepository = new BenchmarkPropertyRepository(_dbContext);
-        var resourceRepository = new ResourceRepository(_dbContext);
-        var availabilitySource = new AvailabilityDataSource(
-            _dbContext,
-            ruleRepository,
-            busyRepository,
-            propertyRepository,
-            resourceRepository);
         var schemaSource = new PropertySchemaDataSource(_dbContext);
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(availabilitySource, schemaService, new AvailabilityEngine());
+        var computeQueryService = new AvailabilityComputeQueryService(_dbContext);
+        var filterQueryService = new AvailabilityFilterQueryService(_dbContext);
+        var ancestorQueryService = new AvailabilityAncestorQueryService(_dbContext);
+        _service = new AvailabilityService(
+            computeQueryService,
+            filterQueryService,
+            ancestorQueryService,
+            schemaService,
+            new AvailabilityEngine());
 
         _request = Scenario.BuildRequest(_dbContext);
     }
@@ -105,8 +104,13 @@ public class EndToEndBenchmarks
             friday,
             friday,
             new[] { room3 },
-            PropertyIds: new[] { imaging },
-            IncludePropertyDescendants: true,
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { imaging },
+                    MatchMode: "and",
+                    IncludePropertyDescendants: true)
+            },
             SlotDurationMinutes: 60,
             IncludeRemainderSlot: true);
     }
@@ -257,136 +261,6 @@ public class EndToEndBenchmarks
         {
             TenantId = tenantId;
             TenantKey = tenantKey;
-        }
-    }
-
-    private sealed class BenchmarkPropertyRepository : IPropertyRepository
-    {
-        private readonly SchedulerDbContext _dbContext;
-
-        public BenchmarkPropertyRepository(SchedulerDbContext dbContext)
-        {
-            _dbContext = dbContext;
-        }
-
-        public async Task<IReadOnlyList<ResourceProperties>> ExpandPropertySubtreeAsync(
-            int propertyId,
-            CancellationToken ct)
-        {
-            var properties = await _dbContext.ResourceProperties
-                .AsNoTracking()
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            if (properties.Count == 0)
-            {
-                return Array.Empty<ResourceProperties>();
-            }
-
-            var children = new Dictionary<int, List<ResourceProperties>>();
-            for (var i = 0; i < properties.Count; i++)
-            {
-                var property = properties[i];
-                if (property.ParentId == null)
-                {
-                    continue;
-                }
-
-                if (!children.TryGetValue(property.ParentId.Value, out var list))
-                {
-                    list = new List<ResourceProperties>();
-                    children[property.ParentId.Value] = list;
-                }
-
-                list.Add(property);
-            }
-
-            var result = new List<ResourceProperties>();
-            var stack = new Stack<int>();
-            stack.Push(propertyId);
-            while (stack.Count > 0)
-            {
-                var current = stack.Pop();
-                var node = properties.FirstOrDefault(item => item.Id == current);
-                if (node == null)
-                {
-                    continue;
-                }
-
-                result.Add(node);
-                if (!children.TryGetValue(current, out var directChildren))
-                {
-                    continue;
-                }
-
-                for (var i = 0; i < directChildren.Count; i++)
-                {
-                    stack.Push(directChildren[i].Id);
-                }
-            }
-
-            return result;
-        }
-
-        public async Task<IReadOnlyList<int>> GetResourceIdsByPropertiesAsync(
-            IReadOnlyCollection<int> propertyIds,
-            CancellationToken ct)
-        {
-            if (propertyIds.Count == 0)
-            {
-                return Array.Empty<int>();
-            }
-
-            var ids = await _dbContext.ResourcePropertyLinks
-                .AsNoTracking()
-                .Where(link => propertyIds.Contains(link.PropertyId))
-                .Select(link => link.ResourceId)
-                .Distinct()
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            return ids;
-        }
-
-        public async Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
-            IReadOnlyCollection<int> propertyIds,
-            CancellationToken ct)
-        {
-            if (propertyIds.Count == 0)
-            {
-                return Array.Empty<int>();
-            }
-
-            var distinctIds = propertyIds.Distinct().ToList();
-            var requiredCount = distinctIds.Count;
-            if (requiredCount == 1)
-            {
-                return await GetResourceIdsByPropertiesAsync(distinctIds, ct).ConfigureAwait(false);
-            }
-
-            var matches = await _dbContext.ResourcePropertyLinks
-                .AsNoTracking()
-                .Where(link => distinctIds.Contains(link.PropertyId))
-                .GroupBy(link => link.ResourceId)
-                .Where(group => group.Select(link => link.PropertyId).Distinct().Count() == requiredCount)
-                .Select(group => group.Key)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            return matches;
-        }
-
-        public async Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
-            IReadOnlyList<IReadOnlyList<int>> propertySets,
-            CancellationToken ct)
-        {
-            var result = new List<IReadOnlyList<int>>(propertySets.Count);
-            for (var i = 0; i < propertySets.Count; i++)
-            {
-                result.Add(await GetResourceIdsByPropertiesAsync(propertySets[i].ToList(), ct).ConfigureAwait(false));
-            }
-
-            return result;
         }
     }
 

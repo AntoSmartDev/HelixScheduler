@@ -16,10 +16,10 @@ public sealed class AvailabilityScenarioTests
 
     public AvailabilityScenarioTests()
     {
-        var dataSource = new DemoAvailabilityDataSource();
+        var dataSource = new DemoAvailabilityQueryService();
         var schemaSource = new DemoPropertySchemaDataSource();
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
     }
 
     [Fact]
@@ -31,8 +31,8 @@ public sealed class AvailabilityScenarioTests
             RequiredResourceIds: Array.Empty<int>(),
             ResourceOrGroups: new[]
             {
-                new[] { DemoAvailabilityDataSource.Doctor7Id, DemoAvailabilityDataSource.Doctor8Id },
-                new[] { DemoAvailabilityDataSource.Room1Id, DemoAvailabilityDataSource.Room4Id }
+                new[] { DemoAvailabilityQueryService.Doctor7Id, DemoAvailabilityQueryService.Doctor8Id },
+                new[] { DemoAvailabilityQueryService.Room1Id, DemoAvailabilityQueryService.Room4Id }
             });
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
@@ -48,7 +48,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Room1Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Room1Id },
             IncludeResourceAncestors: true,
             AncestorFilters: new[]
             {
@@ -67,7 +67,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Room4Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Room4Id },
             IncludeResourceAncestors: true,
             AncestorFilters: new[]
             {
@@ -86,7 +86,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Room2Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Room2Id },
             IncludeResourceAncestors: true);
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
@@ -105,7 +105,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Doctor8Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Doctor8Id },
             IncludeResourceAncestors: true,
             AncestorRelationTypes: new[] { "Contains" });
 
@@ -122,7 +122,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Doctor8Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Doctor8Id },
             IncludeResourceAncestors: true);
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
@@ -144,8 +144,8 @@ public sealed class AvailabilityScenarioTests
             RequiredResourceIds: Array.Empty<int>(),
             ResourceOrGroups: new[]
             {
-                new[] { DemoAvailabilityDataSource.Doctor7Id, DemoAvailabilityDataSource.Doctor8Id },
-                new[] { DemoAvailabilityDataSource.Room1Id, DemoAvailabilityDataSource.Room4Id }
+                new[] { DemoAvailabilityQueryService.Doctor7Id, DemoAvailabilityQueryService.Doctor8Id },
+                new[] { DemoAvailabilityQueryService.Room1Id, DemoAvailabilityQueryService.Room4Id }
             },
             IncludeResourceAncestors: true,
             AncestorMode: "perGroup");
@@ -170,18 +170,23 @@ public sealed class AvailabilityScenarioTests
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
             RequiredResourceIds: Array.Empty<int>(),
-            PropertyIds: new[] { DemoPropertySchemaDataSource.ImagingRootId },
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    MatchMode: "and",
+                    IncludePropertyDescendants: true)
+            },
             ResourceOrGroups: new[]
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Room1Id,
-                    DemoAvailabilityDataSource.Room2Id,
-                    DemoAvailabilityDataSource.Room3Id,
-                    DemoAvailabilityDataSource.Room4Id
+                    DemoAvailabilityQueryService.Room1Id,
+                    DemoAvailabilityQueryService.Room2Id,
+                    DemoAvailabilityQueryService.Room3Id,
+                    DemoAvailabilityQueryService.Room4Id
                 }
-            },
-            IncludePropertyDescendants: true);
+            });
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
         Assert.NotEmpty(result.Slots);
@@ -194,15 +199,20 @@ public sealed class AvailabilityScenarioTests
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
             RequiredResourceIds: Array.Empty<int>(),
-            PropertyIds: new[] { DemoPropertySchemaDataSource.ImagingRootId },
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    MatchMode: "and")
+            },
             ResourceOrGroups: new[]
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Room1Id,
-                    DemoAvailabilityDataSource.Room2Id,
-                    DemoAvailabilityDataSource.Room3Id,
-                    DemoAvailabilityDataSource.Room4Id
+                    DemoAvailabilityQueryService.Room1Id,
+                    DemoAvailabilityQueryService.Room2Id,
+                    DemoAvailabilityQueryService.Room3Id,
+                    DemoAvailabilityQueryService.Room4Id
                 }
             });
 
@@ -227,9 +237,9 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Doctor7Id,
-                    DemoAvailabilityDataSource.Doctor8Id,
-                    DemoAvailabilityDataSource.Doctor9Id
+                    DemoAvailabilityQueryService.Doctor7Id,
+                    DemoAvailabilityQueryService.Doctor8Id,
+                    DemoAvailabilityQueryService.Doctor9Id
                 }
             });
 
@@ -257,8 +267,8 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.SiteAId,
-                    DemoAvailabilityDataSource.SiteBId
+                    DemoAvailabilityQueryService.SiteAId,
+                    DemoAvailabilityQueryService.SiteBId
                 }
             });
 
@@ -289,10 +299,10 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Room1Id,
-                    DemoAvailabilityDataSource.Room2Id,
-                    DemoAvailabilityDataSource.Room3Id,
-                    DemoAvailabilityDataSource.Room4Id
+                    DemoAvailabilityQueryService.Room1Id,
+                    DemoAvailabilityQueryService.Room2Id,
+                    DemoAvailabilityQueryService.Room3Id,
+                    DemoAvailabilityQueryService.Room4Id
                 }
             });
 
@@ -317,8 +327,8 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Doctor8Id,
-                    DemoAvailabilityDataSource.Doctor9Id
+                    DemoAvailabilityQueryService.Doctor8Id,
+                    DemoAvailabilityQueryService.Doctor9Id
                 }
             });
 
@@ -344,10 +354,10 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Room1Id,
-                    DemoAvailabilityDataSource.Room2Id,
-                    DemoAvailabilityDataSource.Room3Id,
-                    DemoAvailabilityDataSource.Room4Id
+                    DemoAvailabilityQueryService.Room1Id,
+                    DemoAvailabilityQueryService.Room2Id,
+                    DemoAvailabilityQueryService.Room3Id,
+                    DemoAvailabilityQueryService.Room4Id
                 }
             });
 
@@ -372,9 +382,9 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.Doctor7Id,
-                    DemoAvailabilityDataSource.Doctor8Id,
-                    DemoAvailabilityDataSource.Doctor9Id
+                    DemoAvailabilityQueryService.Doctor7Id,
+                    DemoAvailabilityQueryService.Doctor8Id,
+                    DemoAvailabilityQueryService.Doctor9Id
                 }
             });
 
@@ -383,13 +393,12 @@ public sealed class AvailabilityScenarioTests
     }
 
     [Fact]
-    public async Task PropertyFilterGroups_Take_Priority_Over_Legacy_PropertyIds()
+    public async Task PropertyFilterGroups_Filter_Matches_Without_Legacy_Fallback()
     {
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 12),
             ToDate: new DateOnly(2026, 1, 12),
             RequiredResourceIds: Array.Empty<int>(),
-            PropertyIds: new[] { DemoPropertySchemaDataSource.LocationRomeId },
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
@@ -400,8 +409,8 @@ public sealed class AvailabilityScenarioTests
             {
                 new[]
                 {
-                    DemoAvailabilityDataSource.SiteAId,
-                    DemoAvailabilityDataSource.SiteBId
+                    DemoAvailabilityQueryService.SiteAId,
+                    DemoAvailabilityQueryService.SiteBId
                 }
             });
 
@@ -429,7 +438,7 @@ public sealed class AvailabilityScenarioTests
             },
             ResourceOrGroups: new[]
             {
-                new[] { DemoAvailabilityDataSource.Doctor7Id }
+                new[] { DemoAvailabilityQueryService.Doctor7Id }
             });
 
         await Assert.ThrowsAsync<AvailabilityRequestException>(() =>
@@ -442,7 +451,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 16),
             ToDate: new DateOnly(2026, 1, 16),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Room3Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Room3Id },
             SlotDurationMinutes: 60,
             IncludeRemainderSlot: true);
 
@@ -463,7 +472,7 @@ public sealed class AvailabilityScenarioTests
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 16),
             ToDate: new DateOnly(2026, 1, 16),
-            RequiredResourceIds: new[] { DemoAvailabilityDataSource.Room3Id },
+            RequiredResourceIds: new[] { DemoAvailabilityQueryService.Room3Id },
             SlotDurationMinutes: 60,
             IncludeRemainderSlot: false);
 
@@ -475,7 +484,7 @@ public sealed class AvailabilityScenarioTests
             result.Slots[0].EndUtc);
     }
 
-    private sealed class DemoAvailabilityDataSource : IAvailabilityDataSource
+    private sealed class DemoAvailabilityQueryService : IAvailabilityComputeQueryService, IAvailabilityFilterQueryService, IAvailabilityAncestorQueryService
     {
         public const int SiteAId = 1;
         public const int SiteBId = 2;
@@ -663,43 +672,6 @@ public sealed class AvailabilityScenarioTests
             return result;
         }
 
-        public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());
-        }
-
-        public Task<IReadOnlyList<RuleSummary>> GetRuleSummariesAsync(
-            DateOnly fromDateUtc,
-            DateOnly toDateUtc,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<RuleSummary>>(Array.Empty<RuleSummary>());
-        }
-
-        public Task<IReadOnlyList<BusyEventSummary>> GetBusyEventSummariesAsync(
-            DateTime fromUtc,
-            DateTime toUtcExclusive,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<BusyEventSummary>>(Array.Empty<BusyEventSummary>());
-        }
-
-        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
-            IReadOnlyList<int> childResourceIds,
-            IReadOnlyList<string>? relationTypes,
-            CancellationToken ct)
-        {
-            var query = Relations.Where(relation => childResourceIds.Contains(relation.ChildResourceId));
-            if (relationTypes != null && relationTypes.Count > 0)
-            {
-                query = query.Where(relation => relationTypes.Contains(relation.RelationType));
-            }
-
-            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(query.ToList());
-        }
-
         public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
             IReadOnlyList<string>? relationTypes,
             CancellationToken ct)
@@ -765,17 +737,17 @@ public sealed class AvailabilityScenarioTests
 
         private static readonly List<ResourceTypeAssignment> Assignments = new()
         {
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.SiteAId, SiteTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.SiteBId, SiteTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.FloorA1Id, FloorTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.FloorB1Id, FloorTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room1Id, RoomTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room2Id, RoomTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room3Id, RoomTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room4Id, RoomTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor7Id, DoctorTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor8Id, DoctorTypeId),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor9Id, DoctorTypeId)
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.SiteAId, SiteTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.SiteBId, SiteTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.FloorA1Id, FloorTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.FloorB1Id, FloorTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room1Id, RoomTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room2Id, RoomTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room3Id, RoomTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room4Id, RoomTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor7Id, DoctorTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor8Id, DoctorTypeId),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor9Id, DoctorTypeId)
         };
 
         public Task<IReadOnlyList<PropertySchemaNode>> GetPropertyNodesAsync(CancellationToken ct)

@@ -75,20 +75,6 @@ public sealed class AvailabilityControllerTests : IClassFixture<CustomWebApplica
     }
 
     [Fact]
-    public async Task Invalid_PropertyIds_Returns_BadRequest()
-    {
-        var response = await _client.GetAsync("/api/availability/slots?fromDate=2025-03-10&toDate=2025-03-10&resourceIds=1&propertyIds=a,b");
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task NonPositive_PropertyIds_Returns_BadRequest()
-    {
-        var response = await _client.GetAsync("/api/availability/slots?fromDate=2025-03-10&toDate=2025-03-10&resourceIds=1&propertyIds=-2");
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
     public async Task PropertyFilterGroups_Empty_PropertyIds_Returns_BadRequest()
     {
         var response = await _client.PostAsJsonAsync("/api/availability/compute", new

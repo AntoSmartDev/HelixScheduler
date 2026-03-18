@@ -1,4 +1,4 @@
-﻿using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability;
 
 namespace HelixScheduler.WebApi.Availability;
 
@@ -22,12 +22,6 @@ public sealed class AvailabilityQueryValidator
         if (HasNonPositive(resourceIds))
         {
             error = "resourceIds must contain only positive integers.";
-            return false;
-        }
-
-        if (input.PropertyIds.Count > 0 && HasNonPositive(input.PropertyIds))
-        {
-            error = "propertyIds must contain only positive integers.";
             return false;
         }
 
@@ -95,10 +89,8 @@ public sealed class AvailabilityQueryValidator
             FromDate: input.FromDate,
             ToDate: input.ToDate,
             RequiredResourceIds: resourceIds,
-            PropertyIds: input.PropertyIds,
             PropertyFilterGroups: null,
             ResourceOrGroups: normalizedGroups,
-            IncludePropertyDescendants: input.IncludePropertyDescendants,
             Explain: input.Explain,
             IncludeResourceAncestors: input.IncludeResourceAncestors,
             AncestorRelationTypes: input.AncestorRelationTypes,
@@ -119,4 +111,3 @@ public sealed class AvailabilityQueryValidator
         return false;
     }
 }
-

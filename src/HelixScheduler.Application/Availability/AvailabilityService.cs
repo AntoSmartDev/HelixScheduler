@@ -13,16 +13,22 @@ public sealed class AvailabilityService : IAvailabilityService
     private const int MaxPropertyFilterGroups = 5;
     private const int MaxPropertyFilterIdsPerGroup = 10;
 
-    private readonly IAvailabilityDataSource _dataSource;
+    private readonly IAvailabilityComputeQueryService _computeQueryService;
+    private readonly IAvailabilityFilterQueryService _filterQueryService;
+    private readonly IAvailabilityAncestorQueryService _ancestorQueryService;
     private readonly PropertySchema.IPropertySchemaService _propertySchemaService;
     private readonly AvailabilityEngine _engine;
 
     public AvailabilityService(
-        IAvailabilityDataSource dataSource,
+        IAvailabilityComputeQueryService computeQueryService,
+        IAvailabilityFilterQueryService filterQueryService,
+        IAvailabilityAncestorQueryService ancestorQueryService,
         PropertySchema.IPropertySchemaService propertySchemaService,
         AvailabilityEngine engine)
     {
-        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _computeQueryService = computeQueryService ?? throw new ArgumentNullException(nameof(computeQueryService));
+        _filterQueryService = filterQueryService ?? throw new ArgumentNullException(nameof(filterQueryService));
+        _ancestorQueryService = ancestorQueryService ?? throw new ArgumentNullException(nameof(ancestorQueryService));
         _propertySchemaService = propertySchemaService ?? throw new ArgumentNullException(nameof(propertySchemaService));
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
     }
@@ -137,11 +143,6 @@ public sealed class AvailabilityService : IAvailabilityService
         if (distinctRequired.Count > MaxRequiredResources)
         {
             throw new AvailabilityRequestException("resourceIds must contain at most 10 items.");
-        }
-
-        if (request.PropertyIds != null && request.PropertyIds.Count > 0 && HasNonPositive(request.PropertyIds))
-        {
-            throw new AvailabilityRequestException("propertyIds must contain only positive integers.");
         }
 
         if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
@@ -426,17 +427,17 @@ public sealed class AvailabilityService : IAvailabilityService
         var resourceIdList = filteredResourceIds.ToList();
         resourceIdList.Sort();
 
-        var rules = await _dataSource.GetRulesAsync(
+        var rules = await _computeQueryService.GetRulesAsync(
             request.FromDate,
             request.ToDate,
             resourceIdList,
             ct).ConfigureAwait(false);
 
-        var resourceCapacities = await _dataSource
+        var resourceCapacities = await _computeQueryService
             .GetResourceCapacitiesAsync(resourceIdList, ct)
             .ConfigureAwait(false);
 
-        var ruleModels = new List<AvailabilityRule>();
+        var availabilityRules = new List<AvailabilityRule>();
         var period = new DatePeriod(request.FromDate, request.ToDate);
         var hasPositive = false;
         var hasNegative = false;
@@ -481,13 +482,13 @@ public sealed class AvailabilityService : IAvailabilityService
                     hasNegative = true;
                 }
 
-                ruleModels.Add(model);
+                availabilityRules.Add(model);
             }
         }
 
         var fromUtc = DateTime.SpecifyKind(request.FromDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var toUtcExclusive = DateTime.SpecifyKind(request.ToDate.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var busyEvents = await _dataSource
+        var busyEvents = await _computeQueryService
             .GetBusyEventsAsync(fromUtc, toUtcExclusive, resourceIdList, ct)
             .ConfigureAwait(false);
 
@@ -509,7 +510,7 @@ public sealed class AvailabilityService : IAvailabilityService
             }
         }
 
-        var inputs = new AvailabilityInputs(ruleModels, busySlots, resourceCapacities);
+        var inputs = new AvailabilityInputs(availabilityRules, busySlots, resourceCapacities);
         var ancestorMode = NormalizeAncestorMode(request.AncestorMode) ?? "perGroup";
         IReadOnlyDictionary<int, List<UtcSlot>>? perResourceAvailability = null;
 
@@ -556,41 +557,27 @@ public sealed class AvailabilityService : IAvailabilityService
         var ids = new List<int>();
         var seen = new HashSet<int>();
 
-        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
+        if (request.PropertyFilterGroups == null || request.PropertyFilterGroups.Count == 0)
         {
-            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
-            {
-                var group = request.PropertyFilterGroups[i];
-                if (group?.PropertyIds == null)
-                {
-                    continue;
-                }
+            return ids;
+        }
 
-                var groupIds = group.PropertyIds;
-                for (var j = 0; j < groupIds.Count; j++)
-                {
-                    var value = groupIds[j];
-                    if (seen.Add(value))
-                    {
-                        ids.Add(value);
-                    }
-                }
+        for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
+        {
+            var group = request.PropertyFilterGroups[i];
+            if (group?.PropertyIds == null)
+            {
+                continue;
             }
 
-            return ids;
-        }
-
-        if (request.PropertyIds == null)
-        {
-            return ids;
-        }
-
-        for (var i = 0; i < request.PropertyIds.Count; i++)
-        {
-            var value = request.PropertyIds[i];
-            if (seen.Add(value))
+            var groupIds = group.PropertyIds;
+            for (var j = 0; j < groupIds.Count; j++)
             {
-                ids.Add(value);
+                var value = groupIds[j];
+                if (seen.Add(value))
+                {
+                    ids.Add(value);
+                }
             }
         }
 
@@ -623,19 +610,6 @@ public sealed class AvailabilityService : IAvailabilityService
 
             return groups;
         }
-
-        if (request.PropertyIds == null || request.PropertyIds.Count == 0)
-        {
-            return groups;
-        }
-
-        var legacyIds = DistinctPropertyIds(request.PropertyIds);
-        if (legacyIds.Count == 0)
-        {
-            return groups;
-        }
-
-        groups.Add(new PropertyFilterGroup(legacyIds, "and", request.IncludePropertyDescendants));
         return groups;
     }
 
@@ -666,7 +640,7 @@ public sealed class AvailabilityService : IAvailabilityService
     {
         if (!group.IncludePropertyDescendants)
         {
-            var matches = await _dataSource
+            var matches = await _filterQueryService
                 .GetResourceIdsByPropertiesAsync(group.PropertyIds, ct)
                 .ConfigureAwait(false);
             return new HashSet<int>(matches);
@@ -689,7 +663,7 @@ public sealed class AvailabilityService : IAvailabilityService
             return new HashSet<int>();
         }
 
-        var resourceMatches = await _dataSource
+        var resourceMatches = await _filterQueryService
             .GetResourceIdsByPropertiesAsync(expandedIds.ToList(), ct)
             .ConfigureAwait(false);
         return new HashSet<int>(resourceMatches);
@@ -702,7 +676,7 @@ public sealed class AvailabilityService : IAvailabilityService
     {
         if (!group.IncludePropertyDescendants && group.PropertyIds.Count > 1)
         {
-            var resourceMatches = await _dataSource
+            var resourceMatches = await _filterQueryService
                 .GetResourceIdsByAllPropertiesAsync(group.PropertyIds, ct)
                 .ConfigureAwait(false);
             return new HashSet<int>(resourceMatches);
@@ -979,7 +953,7 @@ public sealed class AvailabilityService : IAvailabilityService
             return result;
         }
 
-        var loadedMatches = await _dataSource
+        var loadedMatches = await _filterQueryService
             .GetResourceIdsByPropertySetsAsync(pendingSets, ct)
             .ConfigureAwait(false);
 
@@ -1283,7 +1257,7 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         var normalizedTypes = NormalizeRelationTypes(relationTypes);
-        var relations = await _dataSource
+        var relations = await _ancestorQueryService
             .GetResourceRelationsByTypesAsync(normalizedTypes, ct)
             .ConfigureAwait(false);
 
@@ -1553,7 +1527,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private async Task<List<int>> ExpandPropertyIdsAsync(int propertyId, CancellationToken ct)
     {
-        var subtree = await _dataSource.ExpandPropertySubtreeAsync(propertyId, ct).ConfigureAwait(false);
+        var subtree = await _filterQueryService.ExpandPropertySubtreeAsync(propertyId, ct).ConfigureAwait(false);
         var ids = new List<int>(subtree.Count);
         for (var i = 0; i < subtree.Count; i++)
         {
@@ -1853,4 +1827,5 @@ public sealed class AvailabilityService : IAvailabilityService
         }
     }
 }
+
 

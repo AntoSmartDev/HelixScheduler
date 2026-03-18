@@ -10,9 +10,9 @@ public sealed class FilterBatchingTests
     [Fact]
     public async Task PropertyFilterGroups_With_Descendants_Use_Batched_PropertySet_Query()
     {
-        var dataSource = new CountingAvailabilityDataSource();
+        var dataSource = new CountingAvailabilityQueryService();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
@@ -27,7 +27,7 @@ public sealed class FilterBatchingTests
             },
             ResourceOrGroups: new[]
             {
-                new[] { CountingAvailabilityDataSource.ResourceId }
+                new[] { CountingAvailabilityQueryService.ResourceId }
             });
 
         await service.ComputeAsync(request, CancellationToken.None);
@@ -39,14 +39,14 @@ public sealed class FilterBatchingTests
     [Fact]
     public async Task Shared_Subtree_Expansion_Is_Reused_Across_Property_And_Ancestor_Filters()
     {
-        var dataSource = new CountingAvailabilityDataSource();
+        var dataSource = new CountingAvailabilityQueryService();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
             ToDate: new DateOnly(2026, 1, 6),
-            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            RequiredResourceIds: new[] { CountingAvailabilityQueryService.ResourceId },
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
@@ -72,14 +72,14 @@ public sealed class FilterBatchingTests
     [Fact]
     public async Task AncestorFilters_Use_Batched_PropertySet_Query()
     {
-        var dataSource = new CountingAvailabilityDataSource();
+        var dataSource = new CountingAvailabilityQueryService();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
             ToDate: new DateOnly(2026, 1, 6),
-            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            RequiredResourceIds: new[] { CountingAvailabilityQueryService.ResourceId },
             IncludeResourceAncestors: true,
             AncestorFilters: new[]
             {
@@ -99,14 +99,14 @@ public sealed class FilterBatchingTests
     [Fact]
     public async Task IncludeResourceAncestors_Uses_Single_Load_For_Deep_Hierarchy()
     {
-        var dataSource = new CountingAvailabilityDataSource();
+        var dataSource = new CountingAvailabilityQueryService();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
             ToDate: new DateOnly(2026, 1, 6),
-            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            RequiredResourceIds: new[] { CountingAvailabilityQueryService.ResourceId },
             IncludeResourceAncestors: true);
 
         var result = await service.ComputeAsync(request, CancellationToken.None);
@@ -116,7 +116,7 @@ public sealed class FilterBatchingTests
         Assert.Equal(0, dataSource.RelationPerLevelCalls);
     }
 
-    private sealed class CountingAvailabilityDataSource : IAvailabilityDataSource
+    private sealed class CountingAvailabilityQueryService : IAvailabilityComputeQueryService, IAvailabilityFilterQueryService, IAvailabilityAncestorQueryService
     {
         public const int RootAncestorId = 202;
         public const int AncestorId = 201;
@@ -242,39 +242,6 @@ public sealed class FilterBatchingTests
             return Task.FromResult<IReadOnlyList<IReadOnlyList<int>>>(result);
         }
 
-        public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());
-        }
-
-        public Task<IReadOnlyList<RuleSummary>> GetRuleSummariesAsync(
-            DateOnly fromDateUtc,
-            DateOnly toDateUtc,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<RuleSummary>>(Array.Empty<RuleSummary>());
-        }
-
-        public Task<IReadOnlyList<BusyEventSummary>> GetBusyEventSummariesAsync(
-            DateTime fromUtc,
-            DateTime toUtcExclusive,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<BusyEventSummary>>(Array.Empty<BusyEventSummary>());
-        }
-
-        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
-            IReadOnlyList<int> childResourceIds,
-            IReadOnlyList<string>? relationTypes,
-            CancellationToken ct)
-        {
-            RelationPerLevelCalls++;
-            var result = Relations.Where(relation => childResourceIds.Contains(relation.ChildResourceId)).ToList();
-            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(result);
-        }
-
         public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
             IReadOnlyList<string>? relationTypes,
             CancellationToken ct)
@@ -338,12 +305,12 @@ public sealed class FilterBatchingTests
             var result = new List<ResourceTypeAssignment>();
             for (var i = 0; i < resourceIds.Count; i++)
             {
-                if (resourceIds[i] == CountingAvailabilityDataSource.RootAncestorId
-                    || resourceIds[i] == CountingAvailabilityDataSource.AncestorId)
+                if (resourceIds[i] == CountingAvailabilityQueryService.RootAncestorId
+                    || resourceIds[i] == CountingAvailabilityQueryService.AncestorId)
                 {
                     result.Add(new ResourceTypeAssignment(resourceIds[i], AncestorTypeId));
                 }
-                else if (resourceIds[i] == CountingAvailabilityDataSource.ResourceId)
+                else if (resourceIds[i] == CountingAvailabilityQueryService.ResourceId)
                 {
                     result.Add(new ResourceTypeAssignment(resourceIds[i], ResourceTypeId));
                 }

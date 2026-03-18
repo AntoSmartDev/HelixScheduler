@@ -12,10 +12,10 @@ public sealed class AncestorFilterTests
 
     public AncestorFilterTests()
     {
-        var dataSource = new FakeAvailabilityDataSource();
+        var dataSource = new FakeAvailabilityQueryService();
         var schemaSource = new FakePropertySchemaDataSource();
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class AncestorFilterTests
         await Assert.ThrowsAsync<AvailabilityRequestException>(() => _service.ComputeAsync(request, CancellationToken.None));
     }
 
-    private sealed class FakeAvailabilityDataSource : IAvailabilityDataSource
+    private sealed class FakeAvailabilityQueryService : IAvailabilityComputeQueryService, IAvailabilityFilterQueryService, IAvailabilityAncestorQueryService
     {
         private static readonly Dictionary<int, int> ResourceTypes = new()
         {

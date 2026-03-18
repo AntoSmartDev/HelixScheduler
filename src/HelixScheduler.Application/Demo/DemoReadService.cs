@@ -4,11 +4,11 @@ namespace HelixScheduler.Application.Demo;
 
 public sealed class DemoReadService : IDemoReadService
 {
-    private readonly IAvailabilityDataSource _dataSource;
+    private readonly IAvailabilitySummaryQueryService _summaryQueryService;
 
-    public DemoReadService(IAvailabilityDataSource dataSource)
+    public DemoReadService(IAvailabilitySummaryQueryService summaryQueryService)
     {
-        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _summaryQueryService = summaryQueryService ?? throw new ArgumentNullException(nameof(summaryQueryService));
     }
 
     public async Task<DemoScenarioSummary> GetScenarioAsync(DemoScenarioRequest request, CancellationToken ct)
@@ -24,14 +24,14 @@ public sealed class DemoReadService : IDemoReadService
         }
 
         var resourceIds = request.ResourceIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
-        var resources = await _dataSource.GetResourcesAsync(onlySchedulable: false, ct).ConfigureAwait(false);
+        var resources = await _summaryQueryService.GetResourcesAsync(onlySchedulable: false, ct).ConfigureAwait(false);
 
         if (resourceIds.Count == 0)
         {
             resourceIds = resources.Select(resource => resource.Id).ToList();
         }
 
-        var rules = await _dataSource.GetRuleSummariesAsync(
+        var rules = await _summaryQueryService.GetRuleSummariesAsync(
             request.FromDate,
             request.ToDate,
             resourceIds,
@@ -40,7 +40,7 @@ public sealed class DemoReadService : IDemoReadService
         var fromUtc = DateTime.SpecifyKind(request.FromDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         var toUtcExclusive = DateTime.SpecifyKind(request.ToDate.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
 
-        var busy = await _dataSource.GetBusyEventSummariesAsync(
+        var busy = await _summaryQueryService.GetBusyEventSummariesAsync(
             fromUtc,
             toUtcExclusive,
             resourceIds,

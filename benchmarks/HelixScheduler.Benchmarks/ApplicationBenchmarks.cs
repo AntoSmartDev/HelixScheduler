@@ -22,10 +22,10 @@ public class ApplicationBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        var dataSource = new DemoAvailabilityDataSource();
+        var dataSource = new DemoAvailabilityQueryService();
         var schemaSource = new DemoPropertySchemaDataSource();
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
+        _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
         _request = Scenario.BuildRequest();
     }
 
@@ -49,8 +49,8 @@ public class ApplicationBenchmarks
                     Array.Empty<int>(),
                     ResourceOrGroups: new[]
                     {
-                        new[] { DemoAvailabilityDataSource.Doctor7Id, DemoAvailabilityDataSource.Doctor8Id },
-                        new[] { DemoAvailabilityDataSource.Room1Id, DemoAvailabilityDataSource.Room4Id }
+                        new[] { DemoAvailabilityQueryService.Doctor7Id, DemoAvailabilityQueryService.Doctor8Id },
+                        new[] { DemoAvailabilityQueryService.Room1Id, DemoAvailabilityQueryService.Room4Id }
                     },
                     IncludeResourceAncestors: true)),
             new AppScenario(
@@ -59,24 +59,29 @@ public class ApplicationBenchmarks
                     monday,
                     monday,
                     Array.Empty<int>(),
-                    PropertyIds: new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    PropertyFilterGroups: new[]
+                    {
+                        new PropertyFilterGroup(
+                            new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                            MatchMode: "and",
+                            IncludePropertyDescendants: true)
+                    },
                     ResourceOrGroups: new[]
                     {
                         new[]
                         {
-                            DemoAvailabilityDataSource.Room1Id,
-                            DemoAvailabilityDataSource.Room2Id,
-                            DemoAvailabilityDataSource.Room3Id,
-                            DemoAvailabilityDataSource.Room4Id
+                            DemoAvailabilityQueryService.Room1Id,
+                            DemoAvailabilityQueryService.Room2Id,
+                            DemoAvailabilityQueryService.Room3Id,
+                            DemoAvailabilityQueryService.Room4Id
                         }
-                    },
-                    IncludePropertyDescendants: true)),
+                    })),
             new AppScenario(
                 "App_SlotDuration",
                 () => new AvailabilityComputeRequest(
                     friday,
                     friday,
-                    new[] { DemoAvailabilityDataSource.Room3Id },
+                    new[] { DemoAvailabilityQueryService.Room3Id },
                     SlotDurationMinutes: 60,
                     IncludeRemainderSlot: true))
         };
@@ -96,7 +101,7 @@ public class ApplicationBenchmarks
         }
     }
 
-    private sealed class DemoAvailabilityDataSource : IAvailabilityDataSource
+    private sealed class DemoAvailabilityQueryService : IAvailabilityComputeQueryService, IAvailabilityFilterQueryService, IAvailabilityAncestorQueryService
     {
         public const int SiteAId = 1;
         public const int SiteBId = 2;
@@ -284,43 +289,6 @@ public class ApplicationBenchmarks
             return result;
         }
 
-        public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());
-        }
-
-        public Task<IReadOnlyList<RuleSummary>> GetRuleSummariesAsync(
-            DateOnly fromDateUtc,
-            DateOnly toDateUtc,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<RuleSummary>>(Array.Empty<RuleSummary>());
-        }
-
-        public Task<IReadOnlyList<BusyEventSummary>> GetBusyEventSummariesAsync(
-            DateTime fromUtc,
-            DateTime toUtcExclusive,
-            IReadOnlyList<int> resourceIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<BusyEventSummary>>(Array.Empty<BusyEventSummary>());
-        }
-
-        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
-            IReadOnlyList<int> childResourceIds,
-            IReadOnlyList<string>? relationTypes,
-            CancellationToken ct)
-        {
-            var query = Relations.Where(relation => childResourceIds.Contains(relation.ChildResourceId));
-            if (relationTypes != null && relationTypes.Count > 0)
-            {
-                query = query.Where(relation => relationTypes.Contains(relation.RelationType));
-            }
-
-            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(query.ToList());
-        }
-
         public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
             IReadOnlyList<string>? relationTypes,
             CancellationToken ct)
@@ -381,17 +349,17 @@ public class ApplicationBenchmarks
 
         private static readonly List<ResourceTypeAssignment> Assignments = new()
         {
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.SiteAId, 10),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.SiteBId, 10),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.FloorA1Id, 11),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.FloorB1Id, 11),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room1Id, 12),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room2Id, 12),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room3Id, 12),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Room4Id, 12),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor7Id, 13),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor8Id, 13),
-            new ResourceTypeAssignment(DemoAvailabilityDataSource.Doctor9Id, 13)
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.SiteAId, 10),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.SiteBId, 10),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.FloorA1Id, 11),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.FloorB1Id, 11),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room1Id, 12),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room2Id, 12),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room3Id, 12),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Room4Id, 12),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor7Id, 13),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor8Id, 13),
+            new ResourceTypeAssignment(DemoAvailabilityQueryService.Doctor9Id, 13)
         };
 
         public Task<IReadOnlyList<PropertySchemaNode>> GetPropertyNodesAsync(CancellationToken ct)
