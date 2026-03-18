@@ -5,6 +5,8 @@ using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Exporters.Csv;
 using BenchmarkDotNet.Order;
 using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.Orchestration;
+using HelixScheduler.Application.Availability.QueryServices;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Core;
 
@@ -381,3 +383,5 @@ public class ApplicationBenchmarks
         }
     }
 }
+
+

@@ -1,4 +1,8 @@
-namespace HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.QueryServices;
+using HelixScheduler.Application.Availability.Validation;
+
+namespace HelixScheduler.Application.Availability.Filtering;
 
 internal sealed class AvailabilityPropertyFilterEvaluator
 {

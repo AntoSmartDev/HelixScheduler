@@ -1,5 +1,6 @@
 using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.QueryServices;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -261,3 +262,4 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         }
     }
 }
+

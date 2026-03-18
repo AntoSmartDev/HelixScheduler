@@ -1,6 +1,6 @@
 using HelixScheduler.Core;
 
-namespace HelixScheduler.Application.Availability;
+namespace HelixScheduler.Application.Availability.PostProcessing;
 
 internal static class AvailabilityRuleApplicability
 {

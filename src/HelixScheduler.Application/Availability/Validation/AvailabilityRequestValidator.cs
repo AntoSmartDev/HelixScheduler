@@ -1,4 +1,7 @@
-namespace HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.Filtering;
+
+namespace HelixScheduler.Application.Availability.Validation;
 
 internal sealed class AvailabilityRequestValidator
 {

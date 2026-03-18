@@ -1,4 +1,6 @@
-namespace HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability;
+
+namespace HelixScheduler.Application.Availability.Orchestration;
 
 public interface IAvailabilityService
 {

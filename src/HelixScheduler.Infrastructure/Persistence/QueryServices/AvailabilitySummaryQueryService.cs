@@ -1,4 +1,5 @@
 using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.QueryServices;
 using Microsoft.EntityFrameworkCore;
 
 namespace HelixScheduler.Infrastructure.Persistence.QueryServices;
@@ -160,3 +161,4 @@ public sealed class AvailabilitySummaryQueryService : IAvailabilitySummaryQueryS
         return result;
     }
 }
+

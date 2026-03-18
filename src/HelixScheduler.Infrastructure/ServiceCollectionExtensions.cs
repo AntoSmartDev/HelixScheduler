@@ -1,5 +1,6 @@
 using HelixScheduler.Application.Abstractions;
-using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.Orchestration;
+using HelixScheduler.Application.Availability.QueryServices;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Diagnostics;
 using HelixScheduler.Application.PropertySchema;
@@ -56,3 +57,5 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
+

@@ -1,6 +1,11 @@
+using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.Filtering;
+using HelixScheduler.Application.Availability.PostProcessing;
+using HelixScheduler.Application.Availability.QueryServices;
+using HelixScheduler.Application.Availability.Validation;
 using HelixScheduler.Core;
 
-namespace HelixScheduler.Application.Availability;
+namespace HelixScheduler.Application.Availability.Orchestration;
 
 public sealed class AvailabilityService : IAvailabilityService
 {

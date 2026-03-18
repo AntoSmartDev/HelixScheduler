@@ -1,4 +1,6 @@
-namespace HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability;
+
+namespace HelixScheduler.Application.Availability.QueryServices;
 
 public interface IAvailabilityComputeQueryService
 {

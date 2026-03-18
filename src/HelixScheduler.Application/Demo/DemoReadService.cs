@@ -1,4 +1,5 @@
 using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.Availability.QueryServices;
 
 namespace HelixScheduler.Application.Demo;
 
@@ -50,3 +51,4 @@ public sealed class DemoReadService : IDemoReadService
         return new DemoScenarioSummary(resources, rules, busy);
     }
 }
+
