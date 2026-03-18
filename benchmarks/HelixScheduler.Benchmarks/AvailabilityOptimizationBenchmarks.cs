@@ -15,7 +15,7 @@ public class AvailabilityOptimizationBenchmarks
     private const int AncestorAId = 101;
     private const int AncestorBId = 102;
 
-    private readonly AvailabilityEngineV1 _engine = new();
+    private readonly AvailabilityEngine _engine = new();
     private AvailabilityInputs _inputs = null!;
     private AvailabilityQuery _coreQuery = null!;
     private IReadOnlyList<int> _resourceIds = null!;
@@ -251,7 +251,7 @@ public class AvailabilityOptimizationBenchmarks
     private static class ApplicationPathComparer
     {
         public static AvailabilityResult ComputeOrOnlyBaseline(
-            AvailabilityEngineV1 engine,
+            AvailabilityEngine engine,
             DatePeriod period,
             IReadOnlyList<List<int>> orGroups,
             IReadOnlyList<int> allResourceIds,
@@ -312,7 +312,7 @@ public class AvailabilityOptimizationBenchmarks
         }
 
         public static AvailabilityResult ComputePerGroupAncestorsBaseline(
-            AvailabilityEngineV1 engine,
+            AvailabilityEngine engine,
             DatePeriod period,
             IReadOnlyList<List<int>> orGroups,
             IReadOnlyDictionary<int, IReadOnlyCollection<int>> ancestorMap,
@@ -345,7 +345,7 @@ public class AvailabilityOptimizationBenchmarks
         }
 
         public static AvailabilityResult ComputePerGroupAncestorsOptimized(
-            AvailabilityEngineV1 engine,
+            AvailabilityEngine engine,
             DatePeriod period,
             IReadOnlyList<List<int>> orGroups,
             IReadOnlyDictionary<int, IReadOnlyCollection<int>> ancestorMap,

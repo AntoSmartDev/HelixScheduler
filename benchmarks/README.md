@@ -33,7 +33,7 @@ Engine call counts are encoded in the benchmark descriptions for the application
 - optimized paths: 1 per-resource build, 0 `_engine.Compute(...)` calls
 
 Notes:
-- Core benchmarks use purely in-memory data and exercise the AvailabilityEngine.
+- Core benchmarks use purely in-memory data and exercise the canonical AvailabilityEngine.
 - Optimization benchmarks compare baseline helper implementations against the current production path.
 - Application benchmarks include filters, ancestors, and slot duration logic with in-memory data sources.
 - End-to-end benchmarks use EF Core InMemory plus demo seed for a full pipeline sanity check.

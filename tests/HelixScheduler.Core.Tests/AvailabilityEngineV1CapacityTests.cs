@@ -3,12 +3,12 @@ using Xunit;
 
 namespace HelixScheduler.Core.Tests;
 
-public sealed class AvailabilityEngineV1CapacityTests
+public sealed class AvailabilityEngineCapacityTests
 {
     [Fact]
     public void Capacity1_Busy_Blocks_As_Before()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -33,7 +33,7 @@ public sealed class AvailabilityEngineV1CapacityTests
     [Fact]
     public void Capacity2_SingleBusy_Does_Not_Block()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 2;
 
@@ -58,7 +58,7 @@ public sealed class AvailabilityEngineV1CapacityTests
     [Fact]
     public void Capacity2_DoubleBusy_Overlap_Blocks_Overlap()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 3;
 
@@ -89,7 +89,7 @@ public sealed class AvailabilityEngineV1CapacityTests
     [Fact]
     public void Capacity3_DenseBusy_Blocks_Only_Max_Overlap()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 4;
 
@@ -124,7 +124,7 @@ public sealed class AvailabilityEngineV1CapacityTests
     [Fact]
     public void OrGroup_Union_Uses_Capacity_Per_Resource()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var requiredId = 10;
         var resourceA = 11;

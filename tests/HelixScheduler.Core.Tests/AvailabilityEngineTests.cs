@@ -8,7 +8,7 @@ public sealed class AvailabilityEngineTests
     [Fact]
     public void Busy_On_Doctor_Does_Not_Reduce_Room_Availability()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var roomId = 1;
         var doctorId = 7;
@@ -64,7 +64,7 @@ public sealed class AvailabilityEngineTests
     [Fact]
     public void Busy_On_Doctor_And_Room_Blocks_Both()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 12), new DateOnly(2025, 3, 12));
         var roomId = 1;
         var doctorId = 7;
@@ -123,7 +123,7 @@ public sealed class AvailabilityEngineTests
     [Fact]
     public void Busy_Trim_Splits_Slot_And_Ignores_Outside_Window()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -165,7 +165,7 @@ public sealed class AvailabilityEngineTests
     [Fact]
     public void Busy_Touching_Boundary_Does_Not_Reduce_Availability()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -200,7 +200,7 @@ public sealed class AvailabilityEngineTests
     [Fact]
     public void Contiguous_Slots_Merge_When_Same_Resources()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -242,9 +242,9 @@ public sealed class AvailabilityEngineTests
     }
 
     [Fact]
-    public void Unsupported_RuleKind_Throws_NotSupported()
+    public void Monthly_Rule_Is_Supported_By_Canonical_Engine()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -265,7 +265,11 @@ public sealed class AvailabilityEngineTests
         var query = new AvailabilityQuery(period, new[] { resourceId });
         var inputs = new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlotModel>());
 
-        Assert.Throws<NotSupportedException>(() => engine.Compute(query, inputs));
+        var result = engine.Compute(query, inputs);
+
+        Assert.Single(result.Slots);
+        Assert.Equal(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
+        Assert.Equal(new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc), result.Slots[0].EndUtc);
     }
 
     [Fact]

@@ -15,12 +15,12 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private readonly IAvailabilityDataSource _dataSource;
     private readonly PropertySchema.IPropertySchemaService _propertySchemaService;
-    private readonly AvailabilityEngineV1 _engine;
+    private readonly AvailabilityEngine _engine;
 
     public AvailabilityService(
         IAvailabilityDataSource dataSource,
         PropertySchema.IPropertySchemaService propertySchemaService,
-        AvailabilityEngineV1 engine)
+        AvailabilityEngine engine)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         _propertySchemaService = propertySchemaService ?? throw new ArgumentNullException(nameof(propertySchemaService));
@@ -1624,6 +1624,8 @@ public sealed class AvailabilityService : IAvailabilityService
             RuleKind.RecurringWeekly => WeeklyRuleApplies(rule, period),
             RuleKind.SingleDate => SingleDateRuleApplies(rule, period),
             RuleKind.Range => RangeRuleApplies(rule, period),
+            RuleKind.Monthly => MonthlyRuleApplies(rule, period),
+            RuleKind.Repeating => RepeatingRuleApplies(rule, period),
             _ => false
         };
     }
@@ -1672,6 +1674,48 @@ public sealed class AvailabilityService : IAvailabilityService
         var start = rule.FromDate ?? period.From;
         var end = rule.ToDate ?? period.To;
         return !(end < period.From || start > period.To);
+    }
+
+    private static bool MonthlyRuleApplies(RuleModel rule, DatePeriod period)
+    {
+        if (rule.DayOfMonth == null || rule.DayOfMonth <= 0 || rule.DayOfMonth > 31)
+        {
+            return false;
+        }
+
+        foreach (var day in EnumerateDays(period.From, period.To))
+        {
+            if (day.Day == rule.DayOfMonth.Value)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool RepeatingRuleApplies(RuleModel rule, DatePeriod period)
+    {
+        if (rule.IntervalDays == null || rule.IntervalDays <= 0)
+        {
+            return false;
+        }
+
+        var start = rule.FromDate ?? period.From;
+        var end = rule.ToDate ?? period.To;
+        if (end < period.From || start > period.To)
+        {
+            return false;
+        }
+
+        if (start < period.From)
+        {
+            var delta = period.From.DayNumber - start.DayNumber;
+            var skip = delta / rule.IntervalDays.Value;
+            start = start.AddDays(skip * rule.IntervalDays.Value);
+        }
+
+        return start <= end && start <= period.To;
     }
 
     private static IEnumerable<DateOnly> EnumerateDays(DateOnly from, DateOnly to)

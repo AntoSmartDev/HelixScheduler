@@ -1,68 +1,123 @@
 namespace HelixScheduler.Core;
 
 /// <summary>
-/// Availability engine based on SchedulingRule and BusySlot inputs.
+/// Canonical availability engine based on RuleModel/BusySlotModel inputs.
+/// Also exposes a compatibility overload for legacy SchedulingRule/BusySlot callers.
 /// </summary>
 public sealed class AvailabilityEngine
 {
-    /// <summary>
-    /// Computes availability by intersecting per-resource availability and OR groups.
-    /// </summary>
-    /// <param name="query">Availability query (UTC period, resource selection).</param>
-    /// <param name="rules">Scheduler rules in UTC.</param>
-    /// <param name="busySlots">Busy slots in UTC.</param>
-    public AvailabilityResult Compute(
+    public IReadOnlyDictionary<int, List<UtcSlot>> ComputePerResourceAvailability(
         AvailabilityQuery query,
-        IReadOnlyList<SchedulingRule> rules,
-        IReadOnlyList<BusySlot> busySlots)
+        AvailabilityInputs inputs)
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
-        if (rules == null) throw new ArgumentNullException(nameof(rules));
-        if (busySlots == null) throw new ArgumentNullException(nameof(busySlots));
+        if (inputs == null) throw new ArgumentNullException(nameof(inputs));
+
+        if (query.RequiredResourceIds.Count == 0)
+        {
+            return new Dictionary<int, List<UtcSlot>>();
+        }
+
+        var allResourceIds = query.AllResourceIds.Count > 0
+            ? query.AllResourceIds.ToArray()
+            : query.RequiredResourceIds.ToArray();
+        var perResource = new Dictionary<int, List<UtcSlot>>(allResourceIds.Length);
+        var rulesByResource = GroupRulesByResource(inputs.Rules);
+        var busyByResource = GroupBusyByResource(inputs.BusySlots);
+
+        foreach (var resourceId in allResourceIds)
+        {
+            var positive = new List<UtcSlot>();
+            var negative = new List<UtcSlot>();
+
+            if (rulesByResource.TryGetValue(resourceId, out var resourceRules))
+            {
+                for (var i = 0; i < resourceRules.Count; i++)
+                {
+                    var rule = resourceRules[i];
+                    var occurrences = GenerateOccurrences(rule, query.Period);
+                    if (occurrences.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (rule.IsExclude)
+                    {
+                        negative.AddRange(occurrences);
+                    }
+                    else
+                    {
+                        positive.AddRange(occurrences);
+                    }
+                }
+            }
+
+            if (positive.Count == 0)
+            {
+                perResource[resourceId] = new List<UtcSlot>();
+                continue;
+            }
+
+            var capacity = ResolveCapacity(inputs.ResourceCapacities, resourceId);
+            if (busyByResource.TryGetValue(resourceId, out var resourceBusy))
+            {
+                if (capacity <= 1)
+                {
+                    for (var i = 0; i < resourceBusy.Count; i++)
+                    {
+                        var busy = resourceBusy[i];
+                        negative.Add(new UtcSlot(busy.StartUtc, busy.EndUtc, new[] { resourceId }));
+                    }
+                }
+                else
+                {
+                    var capacityBlocks = BuildCapacityBlocks(resourceBusy, resourceId, capacity);
+                    if (capacityBlocks.Count > 0)
+                    {
+                        negative.AddRange(capacityBlocks);
+                    }
+                }
+            }
+
+            var normalizedPositive = SlotComposition.Normalize(positive, mergeByResources: true);
+            var normalizedNegative = SlotComposition.Normalize(negative, mergeByResources: true);
+            perResource[resourceId] = SubtractSlots(normalizedPositive, normalizedNegative);
+        }
+
+        return perResource;
+    }
+
+    public AvailabilityResult ComposeAvailability(
+        AvailabilityQuery query,
+        IReadOnlyDictionary<int, List<UtcSlot>> perResource)
+    {
+        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (perResource == null) throw new ArgumentNullException(nameof(perResource));
 
         if (query.RequiredResourceIds.Count == 0)
         {
             return new AvailabilityResult(Array.Empty<UtcSlot>());
         }
 
+        var requiredIds = query.RequiredResourceIds.ToArray();
         var allResourceIds = query.AllResourceIds.Count > 0
-            ? query.AllResourceIds
-            : query.RequiredResourceIds.ToList();
-        var perResourceAvailability = new Dictionary<int, List<UtcSlot>>();
+            ? query.AllResourceIds.ToArray()
+            : requiredIds;
 
-        foreach (var resourceId in allResourceIds)
+        if (!perResource.TryGetValue(requiredIds[0], out var first))
         {
-            var positiveRules = rules
-                .Where(rule => !rule.IsExclude && rule.ResourceIds.Contains(resourceId))
-                .ToList();
-
-            var negativeRules = rules
-                .Where(rule => rule.IsExclude && rule.ResourceIds.Contains(resourceId))
-                .ToList();
-
-            var availability = GenerateRuleSlots(positiveRules, query.Period, resourceId);
-            if (availability.Count == 0)
-            {
-                perResourceAvailability[resourceId] = availability;
-                continue;
-            }
-
-            var blocks = GenerateRuleSlots(negativeRules, query.Period, resourceId);
-            blocks.AddRange(busySlots
-                .Where(slot => slot.ResourceId == resourceId)
-                .Select(slot => new UtcSlot(slot.StartUtc, slot.EndUtc, new[] { resourceId })));
-
-            availability = SubtractSlots(availability, blocks);
-            availability = SlotComposition.Normalize(availability, mergeByResources: true);
-
-            perResourceAvailability[resourceId] = availability;
+            return new AvailabilityResult(Array.Empty<UtcSlot>());
         }
 
-        var requiredIds = query.RequiredResourceIds.ToArray();
-        var intersection = perResourceAvailability[requiredIds[0]];
+        var intersection = first;
         for (var index = 1; index < requiredIds.Length; index++)
         {
-            intersection = SlotComposition.IntersectByTime(intersection, perResourceAvailability[requiredIds[index]]);
+            if (!perResource.TryGetValue(requiredIds[index], out var resourceSlots))
+            {
+                return new AvailabilityResult(Array.Empty<UtcSlot>());
+            }
+
+            intersection = SlotComposition.IntersectByTime(intersection, resourceSlots);
             if (intersection.Count == 0)
             {
                 break;
@@ -78,7 +133,7 @@ public sealed class AvailabilityEngine
                 break;
             }
 
-            var union = SlotComposition.UnionByTime(group, perResourceAvailability);
+            var union = SlotComposition.UnionByTime(group, perResource);
             if (union.Count == 0)
             {
                 intersection = new List<UtcSlot>();
@@ -92,150 +147,174 @@ public sealed class AvailabilityEngine
             }
         }
 
-        var resultResourceIds = allResourceIds.ToArray();
-        var resultSlots = intersection
-            .Select(slot => new UtcSlot(slot.StartUtc, slot.EndUtc, resultResourceIds))
-            .ToList();
+        var resultSlots = new List<UtcSlot>(intersection.Count);
+        for (var i = 0; i < intersection.Count; i++)
+        {
+            resultSlots.Add(new UtcSlot(intersection[i].StartUtc, intersection[i].EndUtc, allResourceIds));
+        }
 
         resultSlots = SlotComposition.Normalize(resultSlots, mergeByResources: true);
-
         return new AvailabilityResult(resultSlots);
     }
 
-    private static List<UtcSlot> GenerateRuleSlots(
-        IReadOnlyList<SchedulingRule> rules,
-        DatePeriod period,
-        int resourceId)
+    /// <summary>
+    /// Computes availability from normalized RuleModel/BusySlotModel inputs.
+    /// </summary>
+    public AvailabilityResult Compute(AvailabilityQuery query, AvailabilityInputs inputs)
     {
-        var slots = new List<UtcSlot>();
-        foreach (var rule in rules)
-        {
-            slots.AddRange(GenerateRuleSlots(rule, period, resourceId));
-        }
+        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (inputs == null) throw new ArgumentNullException(nameof(inputs));
 
-        return slots;
+        var perResource = ComputePerResourceAvailability(query, inputs);
+        return ComposeAvailability(query, perResource);
     }
 
-    private static IEnumerable<UtcSlot> GenerateRuleSlots(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
+    /// <summary>
+    /// Compatibility overload for callers that still use SchedulingRule/BusySlot inputs.
+    /// </summary>
+    public AvailabilityResult Compute(
+        AvailabilityQuery query,
+        IReadOnlyList<SchedulingRule> rules,
+        IReadOnlyList<BusySlot> busySlots)
+    {
+        if (query == null) throw new ArgumentNullException(nameof(query));
+        if (rules == null) throw new ArgumentNullException(nameof(rules));
+        if (busySlots == null) throw new ArgumentNullException(nameof(busySlots));
+
+        var normalizedRules = new List<RuleModel>();
+        for (var i = 0; i < rules.Count; i++)
+        {
+            var rule = rules[i];
+            for (var r = 0; r < rule.ResourceIds.Count; r++)
+            {
+                normalizedRules.Add(new RuleModel(
+                    id: i + 1,
+                    kind: MapRuleKind(rule.Kind),
+                    isExclude: rule.IsExclude,
+                    fromDate: rule.FromDateUtc,
+                    toDate: rule.ToDateUtc,
+                    singleDate: rule.SingleDateUtc,
+                    startTime: rule.TimeRange.Start,
+                    endTime: rule.TimeRange.End,
+                    daysOfWeekMask: rule.DaysOfWeekMask,
+                    dayOfMonth: rule.DayOfMonth,
+                    intervalDays: rule.IntervalDays,
+                    resourceId: rule.ResourceIds[r]));
+            }
+        }
+
+        var normalizedBusy = new List<BusySlotModel>(busySlots.Count);
+        for (var i = 0; i < busySlots.Count; i++)
+        {
+            var busy = busySlots[i];
+            normalizedBusy.Add(new BusySlotModel(busy.StartUtc, busy.EndUtc, busy.ResourceId));
+        }
+
+        return Compute(query, new AvailabilityInputs(normalizedRules, normalizedBusy, new Dictionary<int, int>()));
+    }
+
+    private static List<UtcSlot> GenerateOccurrences(RuleModel rule, DatePeriod period)
     {
         return rule.Kind switch
         {
-            SchedulingRuleKind.SingleDate => GenerateSingleDate(rule, period, resourceId),
-            SchedulingRuleKind.Weekly => GenerateWeekly(rule, period, resourceId),
-            SchedulingRuleKind.Range => GenerateRange(rule, period, resourceId),
-            SchedulingRuleKind.Monthly => GenerateMonthly(rule, period, resourceId),
-            SchedulingRuleKind.Repeating => GenerateRepeating(rule, period, resourceId),
-            _ => Array.Empty<UtcSlot>()
+            RuleKind.RecurringWeekly => GenerateWeekly(rule, period),
+            RuleKind.SingleDate => GenerateSingleDate(rule, period),
+            RuleKind.Range => GenerateRange(rule, period),
+            RuleKind.Monthly => GenerateMonthly(rule, period),
+            RuleKind.Repeating => GenerateRepeating(rule, period),
+            _ => throw new NotSupportedException($"RuleKind {rule.Kind} is not supported.")
         };
     }
 
-    private static IEnumerable<UtcSlot> GenerateSingleDate(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
-    {
-        if (rule.SingleDateUtc == null)
-        {
-            return Array.Empty<UtcSlot>();
-        }
-
-        var date = rule.SingleDateUtc.Value;
-        if (date < period.From || date > period.To)
-        {
-            return Array.Empty<UtcSlot>();
-        }
-
-        return new[] { CreateSlot(date, rule.TimeRange, resourceId) };
-    }
-
-    private static IEnumerable<UtcSlot> GenerateWeekly(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
+    private static List<UtcSlot> GenerateWeekly(RuleModel rule, DatePeriod period)
     {
         if (rule.DaysOfWeekMask == null)
         {
-            return Array.Empty<UtcSlot>();
+            return new List<UtcSlot>();
         }
 
         var slots = new List<UtcSlot>();
-        foreach (var date in EnumerateDates(period.From, period.To))
+        foreach (var day in period.EnumerateDays())
         {
-            if (MatchesDayOfWeek(date.DayOfWeek, rule.DaysOfWeekMask.Value))
+            if (MatchesDayOfWeek(day.DayOfWeek, rule.DaysOfWeekMask.Value))
             {
-                slots.Add(CreateSlot(date, rule.TimeRange, resourceId));
+                slots.Add(CreateSlot(day, rule));
             }
         }
 
         return slots;
     }
 
-    private static IEnumerable<UtcSlot> GenerateRange(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
+    private static List<UtcSlot> GenerateSingleDate(RuleModel rule, DatePeriod period)
     {
-        var from = rule.FromDateUtc ?? period.From;
-        var to = rule.ToDateUtc ?? period.To;
+        if (rule.SingleDate == null)
+        {
+            return new List<UtcSlot>();
+        }
+
+        var date = rule.SingleDate.Value;
+        if (date < period.From || date > period.To)
+        {
+            return new List<UtcSlot>();
+        }
+
+        return new List<UtcSlot> { CreateSlot(date, rule) };
+    }
+
+    private static List<UtcSlot> GenerateRange(RuleModel rule, DatePeriod period)
+    {
+        var from = rule.FromDate ?? period.From;
+        var to = rule.ToDate ?? period.To;
 
         if (from > period.To || to < period.From)
         {
-            return Array.Empty<UtcSlot>();
+            return new List<UtcSlot>();
         }
 
         var start = from < period.From ? period.From : from;
         var end = to > period.To ? period.To : to;
 
         var slots = new List<UtcSlot>();
-        foreach (var date in EnumerateDates(start, end))
+        foreach (var day in EnumerateDays(start, end))
         {
-            slots.Add(CreateSlot(date, rule.TimeRange, resourceId));
+            slots.Add(CreateSlot(day, rule));
         }
 
         return slots;
     }
 
-    private static IEnumerable<UtcSlot> GenerateMonthly(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
+    private static List<UtcSlot> GenerateMonthly(RuleModel rule, DatePeriod period)
     {
-        if (rule.DayOfMonth == null)
+        if (rule.DayOfMonth == null || rule.DayOfMonth <= 0 || rule.DayOfMonth > 31)
         {
-            return Array.Empty<UtcSlot>();
+            return new List<UtcSlot>();
         }
 
         var slots = new List<UtcSlot>();
-        foreach (var date in EnumerateDates(period.From, period.To))
+        foreach (var day in period.EnumerateDays())
         {
-            if (date.Day == rule.DayOfMonth.Value)
+            if (day.Day == rule.DayOfMonth.Value)
             {
-                slots.Add(CreateSlot(date, rule.TimeRange, resourceId));
+                slots.Add(CreateSlot(day, rule));
             }
         }
 
         return slots;
     }
 
-    private static IEnumerable<UtcSlot> GenerateRepeating(
-        SchedulingRule rule,
-        DatePeriod period,
-        int resourceId)
+    private static List<UtcSlot> GenerateRepeating(RuleModel rule, DatePeriod period)
     {
         if (rule.IntervalDays == null || rule.IntervalDays <= 0)
         {
-            return Array.Empty<UtcSlot>();
+            return new List<UtcSlot>();
         }
 
-        var start = rule.FromDateUtc ?? period.From;
-        var end = rule.ToDateUtc ?? period.To;
+        var start = rule.FromDate ?? period.From;
+        var end = rule.ToDate ?? period.To;
 
         if (end < period.From || start > period.To)
         {
-            return Array.Empty<UtcSlot>();
+            return new List<UtcSlot>();
         }
 
         if (start < period.From)
@@ -250,25 +329,25 @@ public sealed class AvailabilityEngine
         {
             if (date >= period.From)
             {
-                slots.Add(CreateSlot(date, rule.TimeRange, resourceId));
+                slots.Add(CreateSlot(date, rule));
             }
         }
 
         return slots;
     }
 
-    private static UtcSlot CreateSlot(DateOnly date, TimeRange range, int resourceId)
+    private static UtcSlot CreateSlot(DateOnly date, RuleModel rule)
     {
-        var start = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(range.Start)), DateTimeKind.Utc);
-        var end = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(range.End)), DateTimeKind.Utc);
-        return new UtcSlot(start, end, new[] { resourceId });
+        var start = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.StartTime)), DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.EndTime)), DateTimeKind.Utc);
+        return new UtcSlot(start, end, new[] { rule.ResourceId });
     }
 
-    private static IEnumerable<DateOnly> EnumerateDates(DateOnly from, DateOnly to)
+    private static IEnumerable<DateOnly> EnumerateDays(DateOnly from, DateOnly to)
     {
-        for (var date = from; date <= to; date = date.AddDays(1))
+        for (var day = from; day <= to; day = day.AddDays(1))
         {
-            yield return date;
+            yield return day;
         }
     }
 
@@ -285,54 +364,201 @@ public sealed class AvailabilityEngine
             return available;
         }
 
-        var result = new List<UtcSlot>();
-        var orderedBlocks = blocks
-            .OrderBy(slot => slot.StartUtc)
-            .ThenBy(slot => slot.EndUtc)
-            .ToList();
+        var result = new List<UtcSlot>(available.Count);
+        var blockIndex = 0;
 
-        foreach (var slot in SlotComposition.Normalize(available, mergeByResources: true))
+        for (var i = 0; i < available.Count; i++)
         {
-            var segments = new List<UtcSlot> { slot };
-            foreach (var block in orderedBlocks)
+            var slot = available[i];
+
+            while (blockIndex < blocks.Count && blocks[blockIndex].EndUtc <= slot.StartUtc)
             {
-                segments = segments
-                    .SelectMany(segment => SubtractSegment(segment, block))
-                    .ToList();
-                if (segments.Count == 0)
+                blockIndex++;
+            }
+
+            var currentStart = slot.StartUtc;
+            var scanIndex = blockIndex;
+
+            while (scanIndex < blocks.Count)
+            {
+                var block = blocks[scanIndex];
+                if (block.StartUtc >= slot.EndUtc)
                 {
                     break;
                 }
+
+                if (block.EndUtc <= currentStart)
+                {
+                    scanIndex++;
+                    continue;
+                }
+
+                if (block.StartUtc > currentStart)
+                {
+                    result.Add(new UtcSlot(currentStart, block.StartUtc, slot.ResourceIds));
+                }
+
+                if (block.EndUtc >= slot.EndUtc)
+                {
+                    currentStart = slot.EndUtc;
+                    break;
+                }
+
+                currentStart = block.EndUtc;
+                scanIndex++;
             }
 
-            result.AddRange(segments);
+            if (currentStart < slot.EndUtc)
+            {
+                result.Add(new UtcSlot(currentStart, slot.EndUtc, slot.ResourceIds));
+            }
         }
 
-        return SlotComposition.Normalize(result, mergeByResources: true);
+        return result;
     }
 
-    private static IEnumerable<UtcSlot> SubtractSegment(UtcSlot segment, UtcSlot block)
+    private static RuleKind MapRuleKind(SchedulingRuleKind kind)
     {
-        if (block.EndUtc <= segment.StartUtc || block.StartUtc >= segment.EndUtc)
+        return kind switch
         {
-            yield return segment;
-            yield break;
-        }
-
-        if (block.StartUtc <= segment.StartUtc && block.EndUtc >= segment.EndUtc)
-        {
-            yield break;
-        }
-
-        if (block.StartUtc > segment.StartUtc)
-        {
-            yield return new UtcSlot(segment.StartUtc, block.StartUtc, segment.ResourceIds);
-        }
-
-        if (block.EndUtc < segment.EndUtc)
-        {
-            yield return new UtcSlot(block.EndUtc, segment.EndUtc, segment.ResourceIds);
-        }
+            SchedulingRuleKind.Weekly => RuleKind.RecurringWeekly,
+            SchedulingRuleKind.Monthly => RuleKind.Monthly,
+            SchedulingRuleKind.SingleDate => RuleKind.SingleDate,
+            SchedulingRuleKind.Range => RuleKind.Range,
+            SchedulingRuleKind.Repeating => RuleKind.Repeating,
+            _ => throw new NotSupportedException($"SchedulingRuleKind {kind} is not supported.")
+        };
     }
 
+    private static int ResolveCapacity(IReadOnlyDictionary<int, int> capacities, int resourceId)
+    {
+        if (capacities.Count == 0)
+        {
+            return 1;
+        }
+
+        if (capacities.TryGetValue(resourceId, out var capacity))
+        {
+            return capacity < 1 ? 1 : capacity;
+        }
+
+        return 1;
+    }
+
+    private static List<UtcSlot> BuildCapacityBlocks(
+        IReadOnlyList<BusySlotModel> busySlots,
+        int resourceId,
+        int capacity)
+    {
+        var edges = new List<BusyEdge>();
+        for (var i = 0; i < busySlots.Count; i++)
+        {
+            var busy = busySlots[i];
+            edges.Add(new BusyEdge(busy.StartUtc, 1));
+            edges.Add(new BusyEdge(busy.EndUtc, -1));
+        }
+
+        if (edges.Count == 0)
+        {
+            return new List<UtcSlot>();
+        }
+
+        edges.Sort(BusyEdgeComparer.Instance);
+
+        var blocks = new List<UtcSlot>();
+        var occupancy = 0;
+
+        for (var index = 0; index < edges.Count; index++)
+        {
+            var current = edges[index].Timestamp;
+            var delta = 0;
+
+            var nextIndex = index;
+            while (nextIndex < edges.Count && edges[nextIndex].Timestamp == current)
+            {
+                delta += edges[nextIndex].Delta;
+                nextIndex++;
+            }
+
+            occupancy += delta;
+            if (nextIndex >= edges.Count)
+            {
+                break;
+            }
+
+            var next = edges[nextIndex].Timestamp;
+            if (next > current && occupancy >= capacity)
+            {
+                blocks.Add(new UtcSlot(current, next, new[] { resourceId }));
+            }
+
+            index = nextIndex - 1;
+        }
+
+        return blocks;
+    }
+
+    private static Dictionary<int, List<RuleModel>> GroupRulesByResource(IReadOnlyList<RuleModel> rules)
+    {
+        var grouped = new Dictionary<int, List<RuleModel>>();
+        for (var i = 0; i < rules.Count; i++)
+        {
+            var rule = rules[i];
+            if (!grouped.TryGetValue(rule.ResourceId, out var resourceRules))
+            {
+                resourceRules = new List<RuleModel>();
+                grouped[rule.ResourceId] = resourceRules;
+            }
+
+            resourceRules.Add(rule);
+        }
+
+        return grouped;
+    }
+
+    private static Dictionary<int, List<BusySlotModel>> GroupBusyByResource(IReadOnlyList<BusySlotModel> busySlots)
+    {
+        var grouped = new Dictionary<int, List<BusySlotModel>>();
+        for (var i = 0; i < busySlots.Count; i++)
+        {
+            var busy = busySlots[i];
+            if (!grouped.TryGetValue(busy.ResourceId, out var resourceBusy))
+            {
+                resourceBusy = new List<BusySlotModel>();
+                grouped[busy.ResourceId] = resourceBusy;
+            }
+
+            resourceBusy.Add(busy);
+        }
+
+        return grouped;
+    }
+
+    private readonly struct BusyEdge
+    {
+        public BusyEdge(DateTime timestamp, int delta)
+        {
+            Timestamp = timestamp;
+            Delta = delta;
+        }
+
+        public DateTime Timestamp { get; }
+        public int Delta { get; }
+    }
+
+    private sealed class BusyEdgeComparer : IComparer<BusyEdge>
+    {
+        public static BusyEdgeComparer Instance { get; } = new();
+
+        public int Compare(BusyEdge x, BusyEdge y)
+        {
+            var timeCompare = x.Timestamp.CompareTo(y.Timestamp);
+            if (timeCompare != 0)
+            {
+                return timeCompare;
+            }
+
+            return x.Delta.CompareTo(y.Delta);
+        }
+    }
 }

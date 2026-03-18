@@ -15,7 +15,7 @@ public sealed class AncestorFilterTests
         var dataSource = new FakeAvailabilityDataSource();
         var schemaSource = new FakePropertySchemaDataSource();
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
     }
 
     [Fact]

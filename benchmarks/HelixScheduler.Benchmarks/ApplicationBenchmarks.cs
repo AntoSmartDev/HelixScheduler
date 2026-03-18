@@ -25,7 +25,7 @@ public class ApplicationBenchmarks
         var dataSource = new DemoAvailabilityDataSource();
         var schemaSource = new DemoPropertySchemaDataSource();
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        _service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
         _request = Scenario.BuildRequest();
     }
 

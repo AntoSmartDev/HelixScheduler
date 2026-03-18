@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddHelixSchedulerWebApi(this IServiceCollection services)
     {
-        services.AddSingleton<AvailabilityEngineV1>();
+        services.AddSingleton<AvailabilityEngine>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IDemoReadService, DemoReadService>();

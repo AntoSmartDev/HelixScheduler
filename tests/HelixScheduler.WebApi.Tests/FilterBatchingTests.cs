@@ -12,7 +12,7 @@ public sealed class FilterBatchingTests
     {
         var dataSource = new CountingAvailabilityDataSource();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
@@ -41,7 +41,7 @@ public sealed class FilterBatchingTests
     {
         var dataSource = new CountingAvailabilityDataSource();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
@@ -74,7 +74,7 @@ public sealed class FilterBatchingTests
     {
         var dataSource = new CountingAvailabilityDataSource();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),
@@ -101,7 +101,7 @@ public sealed class FilterBatchingTests
     {
         var dataSource = new CountingAvailabilityDataSource();
         var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
-        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
             FromDate: new DateOnly(2026, 1, 6),

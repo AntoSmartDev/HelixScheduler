@@ -1,14 +1,14 @@
-using HelixScheduler.Core;
+﻿using HelixScheduler.Core;
 using Xunit;
 
 namespace HelixScheduler.Core.Tests;
 
-public sealed class AvailabilityEngineV1Tests
+public sealed class AvailabilityEngineCanonicalTests
 {
     [Fact]
     public void R3_Busy_Doctor_Does_Not_Reduce_Room_And_Intersection_Splits()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var doctorId = 7;
         var roomId = 1;
@@ -40,7 +40,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void R3_Busy_Multi_Resource_Splits_Intersection()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 12), new DateOnly(2025, 3, 12));
         var doctorId = 7;
         var roomId = 1;
@@ -76,7 +76,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Busy_Overlap_Trimming_And_Outside_Window()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -110,7 +110,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Contiguous_Slots_Merge_For_Same_Resources()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -131,7 +131,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Negative_Only_Yields_No_Availability()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -158,7 +158,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Busy_Can_Remove_Entire_Window()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
@@ -177,7 +177,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Range_Rule_Is_Clipped_To_Query_Period()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var resourceId = 1;
 
@@ -206,7 +206,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Rules_Outside_Period_Are_Ignored()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var resourceId = 1;
 
@@ -233,7 +233,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Weekly_Rule_With_Null_Mask_Yields_No_Slots()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
@@ -260,7 +260,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void OrGroup_Produces_Union_For_Group()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var requiredId = 9;
         var resourceA = 1;
@@ -290,7 +290,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void Required_And_OrGroup_Intersect_Correctly()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var requiredId = 9;
         var resourceA = 1;
@@ -318,7 +318,7 @@ public sealed class AvailabilityEngineV1Tests
     [Fact]
     public void ComposeAvailability_Matches_Full_Compute_Result()
     {
-        var engine = new AvailabilityEngineV1();
+        var engine = new AvailabilityEngine();
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var requiredId = 9;
         var resourceA = 1;
@@ -420,3 +420,4 @@ public sealed class AvailabilityEngineV1Tests
         return mask;
     }
 }
+

@@ -49,7 +49,7 @@ public class EndToEndBenchmarks
             resourceRepository);
         var schemaSource = new PropertySchemaDataSource(_dbContext);
         var schemaService = new PropertySchemaService(schemaSource);
-        _service = new AvailabilityService(availabilitySource, schemaService, new AvailabilityEngineV1());
+        _service = new AvailabilityService(availabilitySource, schemaService, new AvailabilityEngine());
 
         _request = Scenario.BuildRequest(_dbContext);
     }
