@@ -379,12 +379,14 @@ public sealed class AvailabilityEngine
         }
 
         return 1;
-    }    private static List<UtcSlot> BuildCapacityBlocks(
+    }
+
+    private static List<UtcSlot> BuildCapacityBlocks(
         IReadOnlyList<BusySlot> busySlots,
         int resourceId,
         int capacity)
     {
-        var edges = new List<BusyEdge>();
+        var edges = new List<BusyEdge>(busySlots.Count * 2);
         for (var i = 0; i < busySlots.Count; i++)
         {
             var busy = busySlots[i];

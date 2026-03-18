@@ -122,6 +122,35 @@ public sealed class AvailabilityEngineCapacityTests
     }
 
     [Fact]
+    public void Capacity2_TouchingBusySegments_DoNotBlock_When_No_Overlap_Exists()
+    {
+        var engine = new AvailabilityEngine();
+        var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
+        var resourceId = 5;
+
+        var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 9, 11);
+        var busy = new[]
+        {
+            new BusySlot(
+                new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
+                new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
+                resourceId),
+            new BusySlot(
+                new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
+                new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
+                resourceId)
+        };
+
+        var capacities = new Dictionary<int, int> { [resourceId] = 2 };
+        var query = new AvailabilityQuery(period, new[] { resourceId });
+        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, busy, capacities));
+
+        Assert.Single(result.Slots);
+        Assert.Equal(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
+        Assert.Equal(new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc), result.Slots[0].EndUtc);
+    }
+
+    [Fact]
     public void OrGroup_Union_Uses_Capacity_Per_Resource()
     {
         var engine = new AvailabilityEngine();
