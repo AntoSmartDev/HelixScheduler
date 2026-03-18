@@ -96,17 +96,44 @@ public sealed class FilterBatchingTests
         Assert.Equal(0, dataSource.SinglePropertyCalls);
     }
 
+    [Fact]
+    public async Task IncludeResourceAncestors_Uses_Single_Load_For_Deep_Hierarchy()
+    {
+        var dataSource = new CountingAvailabilityDataSource();
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            IncludeResourceAncestors: true);
+
+        var result = await service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.NotEmpty(result.Slots);
+        Assert.Equal(1, dataSource.RelationSingleLoadCalls);
+        Assert.Equal(0, dataSource.RelationPerLevelCalls);
+    }
+
     private sealed class CountingAvailabilityDataSource : IAvailabilityDataSource
     {
+        public const int RootAncestorId = 202;
         public const int AncestorId = 201;
         public const int ResourceId = 301;
 
         public int ExpandPropertySubtreeCalls { get; private set; }
         public int SinglePropertyCalls { get; private set; }
         public int PropertySetBatchCalls { get; private set; }
+        public int RelationPerLevelCalls { get; private set; }
+        public int RelationSingleLoadCalls { get; private set; }
 
         private static readonly IReadOnlyList<ResourceRelationLink> Relations =
-            new[] { new ResourceRelationLink(AncestorId, ResourceId, "Contains") };
+            new[]
+            {
+                new ResourceRelationLink(RootAncestorId, AncestorId, "Contains"),
+                new ResourceRelationLink(AncestorId, ResourceId, "Contains")
+            };
 
         private static readonly IReadOnlyDictionary<int, IReadOnlyList<int>> PropertyLinks =
             new Dictionary<int, IReadOnlyList<int>>
@@ -243,8 +270,23 @@ public sealed class FilterBatchingTests
             IReadOnlyList<string>? relationTypes,
             CancellationToken ct)
         {
+            RelationPerLevelCalls++;
             var result = Relations.Where(relation => childResourceIds.Contains(relation.ChildResourceId)).ToList();
             return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(result);
+        }
+
+        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
+            IReadOnlyList<string>? relationTypes,
+            CancellationToken ct)
+        {
+            RelationSingleLoadCalls++;
+            var result = Relations.AsEnumerable();
+            if (relationTypes != null && relationTypes.Count > 0)
+            {
+                result = result.Where(relation => relationTypes.Contains(relation.RelationType));
+            }
+
+            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(result.ToList());
         }
 
         private static IReadOnlyList<int> ResolveMatches(IReadOnlyList<int> propertyIds)
@@ -296,7 +338,8 @@ public sealed class FilterBatchingTests
             var result = new List<ResourceTypeAssignment>();
             for (var i = 0; i < resourceIds.Count; i++)
             {
-                if (resourceIds[i] == CountingAvailabilityDataSource.AncestorId)
+                if (resourceIds[i] == CountingAvailabilityDataSource.RootAncestorId
+                    || resourceIds[i] == CountingAvailabilityDataSource.AncestorId)
                 {
                     result.Add(new ResourceTypeAssignment(resourceIds[i], AncestorTypeId));
                 }

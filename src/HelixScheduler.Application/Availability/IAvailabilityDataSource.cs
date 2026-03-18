@@ -54,4 +54,8 @@ public interface IAvailabilityDataSource
         IReadOnlyList<int> childResourceIds,
         IReadOnlyList<string>? relationTypes,
         CancellationToken ct);
+
+    Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
+        IReadOnlyList<string>? relationTypes,
+        CancellationToken ct);
 }

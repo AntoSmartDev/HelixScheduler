@@ -353,6 +353,19 @@ public sealed class AncestorFilterTests
 
             return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(query.ToList());
         }
+
+        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
+            IReadOnlyList<string>? relationTypes,
+            CancellationToken ct)
+        {
+            var query = Relations.AsEnumerable();
+            if (relationTypes != null && relationTypes.Count > 0)
+            {
+                query = query.Where(relation => relationTypes.Contains(relation.RelationType));
+            }
+
+            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(query.ToList());
+        }
     }
 
     private sealed class FakePropertySchemaDataSource : IPropertySchemaDataSource

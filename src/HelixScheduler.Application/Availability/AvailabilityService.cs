@@ -1287,51 +1287,88 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         var normalizedTypes = NormalizeRelationTypes(relationTypes);
-        var parentsByChild = new Dictionary<int, HashSet<int>>();
-        var pending = new HashSet<int>(resourceIds);
-        var processed = new HashSet<int>();
+        var relations = await _dataSource
+            .GetResourceRelationsByTypesAsync(normalizedTypes, ct)
+            .ConfigureAwait(false);
 
-        while (pending.Count > 0)
+        var reachable = BuildReachableAncestorParents(resourceIds, relations);
+        if (reachable.Count == 0)
         {
-            var batch = pending.Where(id => processed.Add(id)).ToList();
-            pending.Clear();
-            if (batch.Count == 0)
-            {
-                break;
-            }
-
-            var relations = await _dataSource
-                .GetResourceRelationsAsync(batch, normalizedTypes, ct)
-                .ConfigureAwait(false);
-
-            for (var i = 0; i < relations.Count; i++)
-            {
-                var relation = relations[i];
-                if (!parentsByChild.TryGetValue(relation.ChildResourceId, out var parents))
-                {
-                    parents = new HashSet<int>();
-                    parentsByChild[relation.ChildResourceId] = parents;
-                }
-
-                if (parents.Add(relation.ParentResourceId) && !processed.Contains(relation.ParentResourceId))
-                {
-                    pending.Add(relation.ParentResourceId);
-                }
-            }
+            return AncestorExpansion.Empty;
         }
 
         var ancestorMap = new Dictionary<int, HashSet<int>>();
         var allAncestors = new HashSet<int>();
         foreach (var resourceId in resourceIds)
         {
-            var ancestors = ResolveAncestors(resourceId, parentsByChild, ancestorMap);
+            var ancestors = ResolveAncestors(resourceId, reachable, ancestorMap);
             if (ancestors.Count > 0)
             {
                 allAncestors.UnionWith(ancestors);
             }
         }
 
-        return new AncestorExpansion(ancestorMap, allAncestors, parentsByChild);
+        return new AncestorExpansion(ancestorMap, allAncestors, reachable);
+    }
+
+    private static Dictionary<int, HashSet<int>> BuildReachableAncestorParents(
+        IReadOnlyCollection<int> resourceIds,
+        IReadOnlyList<ResourceRelationLink> relations)
+    {
+        var fullParentsByChild = new Dictionary<int, List<int>>();
+        for (var i = 0; i < relations.Count; i++)
+        {
+            var relation = relations[i];
+            if (!fullParentsByChild.TryGetValue(relation.ChildResourceId, out var parents))
+            {
+                parents = new List<int>();
+                fullParentsByChild[relation.ChildResourceId] = parents;
+            }
+
+            if (!parents.Contains(relation.ParentResourceId))
+            {
+                parents.Add(relation.ParentResourceId);
+            }
+        }
+
+        var reachable = new Dictionary<int, HashSet<int>>();
+        var pending = new Queue<int>();
+        var visited = new HashSet<int>();
+
+        foreach (var resourceId in resourceIds)
+        {
+            if (visited.Add(resourceId))
+            {
+                pending.Enqueue(resourceId);
+            }
+        }
+
+        while (pending.Count > 0)
+        {
+            var childId = pending.Dequeue();
+            if (!fullParentsByChild.TryGetValue(childId, out var parents))
+            {
+                continue;
+            }
+
+            if (!reachable.TryGetValue(childId, out var reachableParents))
+            {
+                reachableParents = new HashSet<int>();
+                reachable[childId] = reachableParents;
+            }
+
+            for (var i = 0; i < parents.Count; i++)
+            {
+                var parentId = parents[i];
+                reachableParents.Add(parentId);
+                if (visited.Add(parentId))
+                {
+                    pending.Enqueue(parentId);
+                }
+            }
+        }
+
+        return reachable;
     }
 
     private static HashSet<int> ResolveAncestors(

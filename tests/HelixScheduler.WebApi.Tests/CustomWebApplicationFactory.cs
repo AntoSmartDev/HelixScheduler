@@ -455,5 +455,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(Array.Empty<ResourceRelationLink>());
         }
+
+        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
+            IReadOnlyList<string>? relationTypes,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(Array.Empty<ResourceRelationLink>());
+        }
     }
 }

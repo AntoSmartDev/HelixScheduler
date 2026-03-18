@@ -5,6 +5,7 @@ BenchmarkSwitcher
     {
         typeof(AvailabilityBenchmarks),
         typeof(AvailabilityOptimizationBenchmarks),
+        typeof(AncestorExpansionBenchmarks),
         typeof(ApplicationBenchmarks),
         typeof(EndToEndBenchmarks)
     })

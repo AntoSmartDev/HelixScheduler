@@ -238,4 +238,26 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
 
         return relations;
     }
+
+    public async Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsByTypesAsync(
+        IReadOnlyList<string>? relationTypes,
+        CancellationToken ct)
+    {
+        var query = _dbContext.ResourceRelations.AsNoTracking();
+
+        if (relationTypes != null && relationTypes.Count > 0)
+        {
+            query = query.Where(relation => relationTypes.Contains(relation.RelationType));
+        }
+
+        var relations = await query
+            .Select(relation => new ResourceRelationLink(
+                relation.ParentResourceId,
+                relation.ChildResourceId,
+                relation.RelationType))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return relations;
+    }
 }
