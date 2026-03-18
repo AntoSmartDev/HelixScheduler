@@ -15,4 +15,8 @@ public interface IPropertyRepository
     Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
         IReadOnlyCollection<int> propertyIds,
         CancellationToken ct);
+
+    Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+        IReadOnlyList<IReadOnlyList<int>> propertySets,
+        CancellationToken ct);
 }

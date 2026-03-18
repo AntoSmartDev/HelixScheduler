@@ -650,6 +650,19 @@ public sealed class AvailabilityScenarioTests
             return Task.FromResult<IReadOnlyList<int>>(ids);
         }
 
+        public async Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+            IReadOnlyList<IReadOnlyList<int>> propertySets,
+            CancellationToken ct)
+        {
+            var result = new List<IReadOnlyList<int>>(propertySets.Count);
+            for (var i = 0; i < propertySets.Count; i++)
+            {
+                result.Add(await GetResourceIdsByPropertiesAsync(propertySets[i].ToList(), ct).ConfigureAwait(false));
+            }
+
+            return result;
+        }
+
         public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
         {
             return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());

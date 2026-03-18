@@ -121,6 +121,13 @@ public sealed class AvailabilityDataSource : IAvailabilityDataSource
         return _propertyRepository.GetResourceIdsByAllPropertiesAsync(propertyIds, ct);
     }
 
+    public Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+        IReadOnlyList<IReadOnlyList<int>> propertySets,
+        CancellationToken ct)
+    {
+        return _propertyRepository.GetResourceIdsByPropertySetsAsync(propertySets, ct);
+    }
+
     public async Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(
         bool onlySchedulable,
         CancellationToken ct)

@@ -311,15 +311,15 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         HashSet<int>? propertyFiltered = null;
+        var propertyExecutionContext = new PropertyFilterExecutionContext();
         var propertyGroups = NormalizePropertyFilterGroups(request);
         if (propertyGroups.Count > 0)
         {
-            var expansionCache = new Dictionary<int, IReadOnlyList<int>>();
             for (var i = 0; i < propertyGroups.Count; i++)
             {
                 var groupMatch = await EvaluatePropertyFilterGroupAsync(
                     propertyGroups[i],
-                    expansionCache,
+                    propertyExecutionContext,
                     ct).ConfigureAwait(false);
 
                 if (groupMatch.Count == 0)
@@ -396,6 +396,7 @@ public sealed class AvailabilityService : IAvailabilityService
                 filteredOrGroups,
                 ancestorExpansion,
                 request.AncestorFilters,
+                propertyExecutionContext,
                 ct).ConfigureAwait(false);
 
             if (!filterResult.IsSatisfied)
@@ -640,7 +641,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private async Task<HashSet<int>> EvaluatePropertyFilterGroupAsync(
         PropertyFilterGroup group,
-        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
         var matchMode = NormalizePropertyMatchMode(group.MatchMode) ?? "and";
@@ -652,15 +653,15 @@ public sealed class AvailabilityService : IAvailabilityService
 
         if (matchMode == "or")
         {
-            return await EvaluateOrPropertyGroupAsync(group, expansionCache, ct).ConfigureAwait(false);
+            return await EvaluateOrPropertyGroupAsync(group, context, ct).ConfigureAwait(false);
         }
 
-        return await EvaluateAndPropertyGroupAsync(group, expansionCache, ct).ConfigureAwait(false);
+        return await EvaluateAndPropertyGroupAsync(group, context, ct).ConfigureAwait(false);
     }
 
     private async Task<HashSet<int>> EvaluateOrPropertyGroupAsync(
         PropertyFilterGroup group,
-        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
         if (!group.IncludePropertyDescendants)
@@ -675,7 +676,7 @@ public sealed class AvailabilityService : IAvailabilityService
         for (var i = 0; i < group.PropertyIds.Count; i++)
         {
             var propertyId = group.PropertyIds[i];
-            var expanded = await ExpandPropertyIdsCachedAsync(propertyId, expansionCache, ct)
+            var expanded = await ExpandPropertyIdsCachedAsync(propertyId, context, ct)
                 .ConfigureAwait(false);
             for (var j = 0; j < expanded.Count; j++)
             {
@@ -696,7 +697,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private async Task<HashSet<int>> EvaluateAndPropertyGroupAsync(
         PropertyFilterGroup group,
-        Dictionary<int, IReadOnlyList<int>> expansionCache,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
         if (!group.IncludePropertyDescendants && group.PropertyIds.Count > 1)
@@ -707,14 +708,14 @@ public sealed class AvailabilityService : IAvailabilityService
             return new HashSet<int>(resourceMatches);
         }
 
-        HashSet<int>? groupMatch = null;
+        var effectivePropertySets = new List<IReadOnlyList<int>>(group.PropertyIds.Count);
         for (var i = 0; i < group.PropertyIds.Count; i++)
         {
             var propertyId = group.PropertyIds[i];
             IReadOnlyList<int> effectiveIds;
             if (group.IncludePropertyDescendants)
             {
-                effectiveIds = await ExpandPropertyIdsCachedAsync(propertyId, expansionCache, ct)
+                effectiveIds = await ExpandPropertyIdsCachedAsync(propertyId, context, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -722,14 +723,18 @@ public sealed class AvailabilityService : IAvailabilityService
                 effectiveIds = new List<int> { propertyId };
             }
 
-            var resourceMatches = await _dataSource
-                .GetResourceIdsByPropertiesAsync(effectiveIds, ct)
-                .ConfigureAwait(false);
-            var matchSet = new HashSet<int>(resourceMatches);
+            effectivePropertySets.Add(effectiveIds);
+        }
+
+        var matchSets = await GetPropertyMatchSetsAsync(effectivePropertySets, context, ct).ConfigureAwait(false);
+        HashSet<int>? groupMatch = null;
+        for (var i = 0; i < matchSets.Count; i++)
+        {
+            var matchSet = matchSets[i];
 
             if (groupMatch == null)
             {
-                groupMatch = matchSet;
+                groupMatch = new HashSet<int>(matchSet);
             }
             else
             {
@@ -763,16 +768,16 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private async Task<IReadOnlyList<int>> ExpandPropertyIdsCachedAsync(
         int propertyId,
-        IDictionary<int, IReadOnlyList<int>> cache,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
-        if (cache.TryGetValue(propertyId, out var cached))
+        if (context.ExpandedPropertyIds.TryGetValue(propertyId, out var cached))
         {
             return cached;
         }
 
         var expanded = await ExpandPropertyIdsAsync(propertyId, ct).ConfigureAwait(false);
-        cache[propertyId] = expanded;
+        context.ExpandedPropertyIds[propertyId] = expanded;
         return expanded;
     }
 
@@ -802,6 +807,7 @@ public sealed class AvailabilityService : IAvailabilityService
         IReadOnlyList<List<int>> orGroups,
         AncestorExpansion expansion,
         IReadOnlyList<AncestorPropertyFilter> filters,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
         var normalizedFilters = NormalizeAncestorFilters(filters);
@@ -837,7 +843,7 @@ public sealed class AvailabilityService : IAvailabilityService
                 continue;
             }
 
-            var matches = await ResolveMatchingAncestorsAsync(filter, candidates, ct).ConfigureAwait(false);
+            var matches = await ResolveMatchingAncestorsAsync(filter, candidates, context, ct).ConfigureAwait(false);
             filterMatches.Add(new AncestorFilterMatch(filter, matches));
         }
 
@@ -884,9 +890,10 @@ public sealed class AvailabilityService : IAvailabilityService
     private async Task<HashSet<int>> ResolveMatchingAncestorsAsync(
         AncestorPropertyFilter filter,
         HashSet<int> candidates,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
-        var propertyGroups = await ExpandAncestorPropertyGroupsAsync(filter, ct).ConfigureAwait(false);
+        var propertyGroups = await ExpandAncestorPropertyGroupsAsync(filter, context, ct).ConfigureAwait(false);
         if (propertyGroups.Count == 0)
         {
             return new HashSet<int>();
@@ -896,17 +903,14 @@ public sealed class AvailabilityService : IAvailabilityService
         var union = new HashSet<int>();
         var isAnd = NormalizeMatchMode(filter.MatchMode) == "and";
 
-        for (var i = 0; i < propertyGroups.Count; i++)
+        var matchSets = await GetPropertyMatchSetsAsync(propertyGroups, context, ct).ConfigureAwait(false);
+        for (var i = 0; i < matchSets.Count; i++)
         {
-            var propertyIds = propertyGroups[i];
-            var resourceMatches = await _dataSource
-                .GetResourceIdsByPropertiesAsync(propertyIds, ct)
-                .ConfigureAwait(false);
-            var matchSet = new HashSet<int>(resourceMatches);
+            var matchSet = matchSets[i];
 
             if (isAnd)
             {
-                intersection ??= matchSet;
+                intersection ??= new HashSet<int>(matchSet);
                 intersection.IntersectWith(matchSet);
             }
             else
@@ -922,6 +926,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
     private async Task<List<List<int>>> ExpandAncestorPropertyGroupsAsync(
         AncestorPropertyFilter filter,
+        PropertyFilterExecutionContext context,
         CancellationToken ct)
     {
         var groups = new List<List<int>>();
@@ -934,7 +939,7 @@ public sealed class AvailabilityService : IAvailabilityService
         {
             var propertyId = filter.PropertyIds[i];
             var expanded = filter.IncludePropertyDescendants
-                ? await ExpandPropertyIdsAsync(propertyId, ct).ConfigureAwait(false)
+                ? await ExpandPropertyIdsCachedAsync(propertyId, context, ct).ConfigureAwait(false)
                 : new List<int> { propertyId };
             if (expanded.Count > 0)
             {
@@ -943,6 +948,56 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         return groups;
+    }
+
+    private async Task<List<HashSet<int>>> GetPropertyMatchSetsAsync(
+        IReadOnlyList<IReadOnlyList<int>> propertySets,
+        PropertyFilterExecutionContext context,
+        CancellationToken ct)
+    {
+        var result = new List<HashSet<int>>(propertySets.Count);
+        var pendingSets = new List<IReadOnlyList<int>>();
+        var pendingIndexes = new List<int>();
+
+        for (var i = 0; i < propertySets.Count; i++)
+        {
+            var normalized = DistinctPropertyIds(propertySets[i]);
+            var cacheKey = BuildPropertySetCacheKey(normalized);
+            if (context.PropertySetMatches.TryGetValue(cacheKey, out var cached))
+            {
+                result.Add(new HashSet<int>(cached));
+                continue;
+            }
+
+            result.Add(new HashSet<int>());
+            pendingSets.Add(normalized);
+            pendingIndexes.Add(i);
+        }
+
+        if (pendingSets.Count == 0)
+        {
+            return result;
+        }
+
+        var loadedMatches = await _dataSource
+            .GetResourceIdsByPropertySetsAsync(pendingSets, ct)
+            .ConfigureAwait(false);
+
+        for (var i = 0; i < pendingSets.Count; i++)
+        {
+            var normalized = DistinctPropertyIds(pendingSets[i]);
+            var cacheKey = BuildPropertySetCacheKey(normalized);
+            var matchSet = new HashSet<int>(loadedMatches[i]);
+            context.PropertySetMatches[cacheKey] = matchSet;
+            result[pendingIndexes[i]] = new HashSet<int>(matchSet);
+        }
+
+        return result;
+    }
+
+    private static string BuildPropertySetCacheKey(IReadOnlyList<int> propertyIds)
+    {
+        return propertyIds.Count == 0 ? string.Empty : string.Join(',', propertyIds);
     }
 
     private static bool ResourcePassesFilters(
@@ -1455,6 +1510,12 @@ public sealed class AvailabilityService : IAvailabilityService
             new Dictionary<int, HashSet<int>>(),
             new HashSet<int>(),
             new Dictionary<int, HashSet<int>>());
+    }
+
+    private sealed class PropertyFilterExecutionContext
+    {
+        public Dictionary<int, IReadOnlyList<int>> ExpandedPropertyIds { get; } = new();
+        public Dictionary<string, HashSet<int>> PropertySetMatches { get; } = new(StringComparer.Ordinal);
     }
 
     private async Task<List<int>> ExpandPropertyIdsAsync(int propertyId, CancellationToken ct)

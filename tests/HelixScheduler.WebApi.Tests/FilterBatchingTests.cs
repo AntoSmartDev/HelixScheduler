@@ -1,0 +1,312 @@
+using HelixScheduler.Application.Availability;
+using HelixScheduler.Application.PropertySchema;
+using HelixScheduler.Core;
+using Xunit;
+
+namespace HelixScheduler.WebApi.Tests;
+
+public sealed class FilterBatchingTests
+{
+    [Fact]
+    public async Task PropertyFilterGroups_With_Descendants_Use_Batched_PropertySet_Query()
+    {
+        var dataSource = new CountingAvailabilityDataSource();
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { CountingPropertySchemaDataSource.SharedRootId, CountingPropertySchemaDataSource.SharedLeafAId },
+                    MatchMode: "and",
+                    IncludePropertyDescendants: true)
+            },
+            ResourceOrGroups: new[]
+            {
+                new[] { CountingAvailabilityDataSource.ResourceId }
+            });
+
+        await service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.Equal(1, dataSource.PropertySetBatchCalls);
+        Assert.Equal(0, dataSource.SinglePropertyCalls);
+    }
+
+    [Fact]
+    public async Task Shared_Subtree_Expansion_Is_Reused_Across_Property_And_Ancestor_Filters()
+    {
+        var dataSource = new CountingAvailabilityDataSource();
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { CountingPropertySchemaDataSource.SharedRootId },
+                    MatchMode: "and",
+                    IncludePropertyDescendants: true)
+            },
+            IncludeResourceAncestors: true,
+            AncestorFilters: new[]
+            {
+                new AncestorPropertyFilter(
+                    ResourceTypeId: CountingPropertySchemaDataSource.AncestorTypeId,
+                    PropertyIds: new[] { CountingPropertySchemaDataSource.SharedRootId },
+                    IncludePropertyDescendants: true)
+            });
+
+        var result = await service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.NotEmpty(result.Slots);
+        Assert.Equal(1, dataSource.ExpandPropertySubtreeCalls);
+    }
+
+    [Fact]
+    public async Task AncestorFilters_Use_Batched_PropertySet_Query()
+    {
+        var dataSource = new CountingAvailabilityDataSource();
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var service = new AvailabilityService(dataSource, schemaService, new AvailabilityEngineV1());
+
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: new[] { CountingAvailabilityDataSource.ResourceId },
+            IncludeResourceAncestors: true,
+            AncestorFilters: new[]
+            {
+                new AncestorPropertyFilter(
+                    ResourceTypeId: CountingPropertySchemaDataSource.AncestorTypeId,
+                    PropertyIds: new[] { CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedLeafBId },
+                    MatchMode: "and")
+            });
+
+        var result = await service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.NotEmpty(result.Slots);
+        Assert.Equal(1, dataSource.PropertySetBatchCalls);
+        Assert.Equal(0, dataSource.SinglePropertyCalls);
+    }
+
+    private sealed class CountingAvailabilityDataSource : IAvailabilityDataSource
+    {
+        public const int AncestorId = 201;
+        public const int ResourceId = 301;
+
+        public int ExpandPropertySubtreeCalls { get; private set; }
+        public int SinglePropertyCalls { get; private set; }
+        public int PropertySetBatchCalls { get; private set; }
+
+        private static readonly IReadOnlyList<ResourceRelationLink> Relations =
+            new[] { new ResourceRelationLink(AncestorId, ResourceId, "Contains") };
+
+        private static readonly IReadOnlyDictionary<int, IReadOnlyList<int>> PropertyLinks =
+            new Dictionary<int, IReadOnlyList<int>>
+            {
+                [AncestorId] = new[] { CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedLeafBId },
+                [ResourceId] = new[] { CountingPropertySchemaDataSource.SharedLeafAId }
+            };
+
+        public Task<IReadOnlyList<RuleData>> GetRulesAsync(
+            DateOnly fromDateUtc,
+            DateOnly toDateUtc,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var rules = new List<RuleData>(resourceIds.Count);
+            for (var i = 0; i < resourceIds.Count; i++)
+            {
+                rules.Add(new RuleData(
+                    resourceIds[i],
+                    (byte)RuleKind.SingleDate,
+                    false,
+                    null,
+                    null,
+                    fromDateUtc,
+                    new TimeOnly(9, 0),
+                    new TimeOnly(10, 0),
+                    null,
+                    null,
+                    null,
+                    new[] { resourceIds[i] }));
+            }
+
+            return Task.FromResult<IReadOnlyList<RuleData>>(rules);
+        }
+
+        public Task<IReadOnlyDictionary<int, int>> GetResourceCapacitiesAsync(
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyDictionary<int, int>>(new Dictionary<int, int>());
+        }
+
+        public Task<IReadOnlyList<BusyEventData>> GetBusyEventsAsync(
+            DateTime fromUtc,
+            DateTime toUtcExclusive,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<BusyEventData>>(Array.Empty<BusyEventData>());
+        }
+
+        public Task<IReadOnlyList<PropertyNode>> ExpandPropertySubtreeAsync(
+            int propertyId,
+            CancellationToken ct)
+        {
+            ExpandPropertySubtreeCalls++;
+            if (propertyId != CountingPropertySchemaDataSource.SharedRootId)
+            {
+                return Task.FromResult<IReadOnlyList<PropertyNode>>(Array.Empty<PropertyNode>());
+            }
+
+            return Task.FromResult<IReadOnlyList<PropertyNode>>(new[]
+            {
+                new PropertyNode(CountingPropertySchemaDataSource.SharedRootId, null, "Shared", "Shared", null),
+                new PropertyNode(CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedRootId, "Shared", "Leaf A", 1),
+                new PropertyNode(CountingPropertySchemaDataSource.SharedLeafBId, CountingPropertySchemaDataSource.SharedRootId, "Shared", "Leaf B", 2)
+            });
+        }
+
+        public Task<IReadOnlyList<int>> GetResourceIdsByPropertiesAsync(
+            IReadOnlyList<int> propertyIds,
+            CancellationToken ct)
+        {
+            SinglePropertyCalls++;
+            return Task.FromResult<IReadOnlyList<int>>(ResolveMatches(propertyIds));
+        }
+
+        public Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
+            IReadOnlyList<int> propertyIds,
+            CancellationToken ct)
+        {
+            var required = new HashSet<int>(propertyIds);
+            var matches = new List<int>();
+            foreach (var link in PropertyLinks)
+            {
+                if (required.All(link.Value.Contains))
+                {
+                    matches.Add(link.Key);
+                }
+            }
+
+            return Task.FromResult<IReadOnlyList<int>>(matches);
+        }
+
+        public Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+            IReadOnlyList<IReadOnlyList<int>> propertySets,
+            CancellationToken ct)
+        {
+            PropertySetBatchCalls++;
+            var result = new List<IReadOnlyList<int>>(propertySets.Count);
+            for (var i = 0; i < propertySets.Count; i++)
+            {
+                result.Add(ResolveMatches(propertySets[i]));
+            }
+
+            return Task.FromResult<IReadOnlyList<IReadOnlyList<int>>>(result);
+        }
+
+        public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ResourceSummary>>(Array.Empty<ResourceSummary>());
+        }
+
+        public Task<IReadOnlyList<RuleSummary>> GetRuleSummariesAsync(
+            DateOnly fromDateUtc,
+            DateOnly toDateUtc,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<RuleSummary>>(Array.Empty<RuleSummary>());
+        }
+
+        public Task<IReadOnlyList<BusyEventSummary>> GetBusyEventSummariesAsync(
+            DateTime fromUtc,
+            DateTime toUtcExclusive,
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<BusyEventSummary>>(Array.Empty<BusyEventSummary>());
+        }
+
+        public Task<IReadOnlyList<ResourceRelationLink>> GetResourceRelationsAsync(
+            IReadOnlyList<int> childResourceIds,
+            IReadOnlyList<string>? relationTypes,
+            CancellationToken ct)
+        {
+            var result = Relations.Where(relation => childResourceIds.Contains(relation.ChildResourceId)).ToList();
+            return Task.FromResult<IReadOnlyList<ResourceRelationLink>>(result);
+        }
+
+        private static IReadOnlyList<int> ResolveMatches(IReadOnlyList<int> propertyIds)
+        {
+            var ids = new HashSet<int>();
+            foreach (var link in PropertyLinks)
+            {
+                if (link.Value.Any(propertyIds.Contains))
+                {
+                    ids.Add(link.Key);
+                }
+            }
+
+            return ids.ToList();
+        }
+    }
+
+    private sealed class CountingPropertySchemaDataSource : IPropertySchemaDataSource
+    {
+        public const int AncestorTypeId = 1;
+        public const int ResourceTypeId = 2;
+        public const int SharedRootId = 10;
+        public const int SharedLeafAId = 11;
+        public const int SharedLeafBId = 12;
+
+        public Task<IReadOnlyList<PropertySchemaNode>> GetPropertyNodesAsync(CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<PropertySchemaNode>>(new[]
+            {
+                new PropertySchemaNode(SharedRootId, null, "Shared", "Shared", null),
+                new PropertySchemaNode(SharedLeafAId, SharedRootId, "Shared", "Leaf A", 1),
+                new PropertySchemaNode(SharedLeafBId, SharedRootId, "Shared", "Leaf B", 2)
+            });
+        }
+
+        public Task<IReadOnlyList<ResourceTypePropertyLink>> GetResourceTypePropertiesAsync(CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ResourceTypePropertyLink>>(new[]
+            {
+                new ResourceTypePropertyLink(AncestorTypeId, SharedRootId),
+                new ResourceTypePropertyLink(ResourceTypeId, SharedRootId)
+            });
+        }
+
+        public Task<IReadOnlyList<ResourceTypeAssignment>> GetResourceTypeAssignmentsAsync(
+            IReadOnlyList<int> resourceIds,
+            CancellationToken ct)
+        {
+            var result = new List<ResourceTypeAssignment>();
+            for (var i = 0; i < resourceIds.Count; i++)
+            {
+                if (resourceIds[i] == CountingAvailabilityDataSource.AncestorId)
+                {
+                    result.Add(new ResourceTypeAssignment(resourceIds[i], AncestorTypeId));
+                }
+                else if (resourceIds[i] == CountingAvailabilityDataSource.ResourceId)
+                {
+                    result.Add(new ResourceTypeAssignment(resourceIds[i], ResourceTypeId));
+                }
+            }
+
+            return Task.FromResult<IReadOnlyList<ResourceTypeAssignment>>(result);
+        }
+    }
+}

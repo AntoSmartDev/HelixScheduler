@@ -227,6 +227,14 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
         }
+
+        public Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+            IReadOnlyList<IReadOnlyList<int>> propertySets,
+            CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<IReadOnlyList<int>>>(
+                propertySets.Select(_ => (IReadOnlyList<int>)Array.Empty<int>()).ToList());
+        }
     }
 
     private sealed class FakeResourceRepository : IResourceRepository
@@ -378,6 +386,13 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             CancellationToken ct)
         {
             return _propertyRepository.GetResourceIdsByAllPropertiesAsync(propertyIds, ct);
+        }
+
+        public Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+            IReadOnlyList<IReadOnlyList<int>> propertySets,
+            CancellationToken ct)
+        {
+            return _propertyRepository.GetResourceIdsByPropertySetsAsync(propertySets, ct);
         }
 
         public Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(

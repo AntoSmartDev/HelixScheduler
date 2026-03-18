@@ -30,6 +30,10 @@ public interface IAvailabilityDataSource
         IReadOnlyList<int> propertyIds,
         CancellationToken ct);
 
+    Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
+        IReadOnlyList<IReadOnlyList<int>> propertySets,
+        CancellationToken ct);
+
     Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(
         bool onlySchedulable,
         CancellationToken ct);
