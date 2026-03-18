@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantStore, TenantStore>();
+        services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
+        services.AddScoped<ITenantBootstrapper, TenantBootstrapper>();
+        services.AddScoped<IDemoSeedInitializer, DemoSeedInitializer>();
         services.AddScoped<PropertyHierarchyQueryService>();
         services.AddScoped<IAvailabilityComputeQueryService, AvailabilityComputeQueryService>();
         services.AddScoped<IAvailabilityFilterQueryService, AvailabilityFilterQueryService>();

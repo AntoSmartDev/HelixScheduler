@@ -2,6 +2,7 @@ using HelixScheduler.Application.Availability;
 
 namespace HelixScheduler.Application.Demo;
 
+// Demo composes canonical availability summary capabilities; it does not own them.
 public sealed class DemoReadService : IDemoReadService
 {
     private readonly IAvailabilitySummaryQueryService _summaryQueryService;
