@@ -2,15 +2,15 @@ namespace HelixScheduler.Application.ResourceCatalog;
 
 public sealed class ResourceTypeCatalogService : IResourceTypeCatalogService
 {
-    private readonly IResourceTypeCatalogDataSource _dataSource;
+    private readonly IResourceTypeCatalogQueryService _queryService;
 
-    public ResourceTypeCatalogService(IResourceTypeCatalogDataSource dataSource)
+    public ResourceTypeCatalogService(IResourceTypeCatalogQueryService queryService)
     {
-        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
     }
 
     public Task<IReadOnlyList<ResourceTypeDto>> GetResourceTypesAsync(CancellationToken ct)
     {
-        return _dataSource.GetResourceTypesAsync(ct);
+        return _queryService.GetResourceTypesAsync(ct);
     }
 }

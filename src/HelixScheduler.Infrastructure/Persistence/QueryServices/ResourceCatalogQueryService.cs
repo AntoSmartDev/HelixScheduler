@@ -2,13 +2,13 @@ using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace HelixScheduler.Infrastructure.Persistence.Repositories;
+namespace HelixScheduler.Infrastructure.Persistence.QueryServices;
 
-public sealed class ResourceCatalogDataSource : IResourceCatalogDataSource
+public sealed class ResourceCatalogQueryService : IResourceCatalogQueryService
 {
     private readonly SchedulerDbContext _dbContext;
 
-    public ResourceCatalogDataSource(SchedulerDbContext dbContext)
+    public ResourceCatalogQueryService(SchedulerDbContext dbContext)
     {
         _dbContext = dbContext;
     }

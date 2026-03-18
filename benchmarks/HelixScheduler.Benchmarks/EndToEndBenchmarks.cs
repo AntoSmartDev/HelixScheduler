@@ -11,7 +11,6 @@ using HelixScheduler.Core;
 using HelixScheduler.Infrastructure.Persistence;
 using HelixScheduler.Infrastructure.Persistence.QueryServices;
 using HelixScheduler.Infrastructure.Persistence.Entities;
-using HelixScheduler.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 [MemoryDiagnoser]
@@ -38,7 +37,7 @@ public class EndToEndBenchmarks
         _dbContext.Database.EnsureCreated();
         SeedBenchmarkData();
 
-        var schemaSource = new PropertySchemaDataSource(_dbContext);
+        var schemaSource = new PropertySchemaQueryService(_dbContext);
         var schemaService = new PropertySchemaService(schemaSource);
         var computeQueryService = new AvailabilityComputeQueryService(_dbContext);
         var filterQueryService = new AvailabilityFilterQueryService(_dbContext);

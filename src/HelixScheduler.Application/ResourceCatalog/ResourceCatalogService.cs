@@ -2,26 +2,26 @@ namespace HelixScheduler.Application.ResourceCatalog;
 
 public sealed class ResourceCatalogService : IResourceCatalogService
 {
-    private readonly IResourceCatalogDataSource _dataSource;
+    private readonly IResourceCatalogQueryService _queryService;
 
-    public ResourceCatalogService(IResourceCatalogDataSource dataSource)
+    public ResourceCatalogService(IResourceCatalogQueryService queryService)
     {
-        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
     }
 
     public async Task<IReadOnlyList<ResourceDto>> GetResourcesAsync(
         bool onlySchedulable,
         CancellationToken ct)
     {
-        var resources = await _dataSource.GetResourcesAsync(onlySchedulable, ct).ConfigureAwait(false);
+        var resources = await _queryService.GetResourcesAsync(onlySchedulable, ct).ConfigureAwait(false);
         if (resources.Count == 0)
         {
             return Array.Empty<ResourceDto>();
         }
 
         var resourceIds = resources.Select(resource => resource.Id).ToList();
-        var links = await _dataSource.GetPropertyLinksAsync(resourceIds, ct).ConfigureAwait(false);
-        var properties = await _dataSource.GetPropertiesAsync(ct).ConfigureAwait(false);
+        var links = await _queryService.GetPropertyLinksAsync(resourceIds, ct).ConfigureAwait(false);
+        var properties = await _queryService.GetPropertiesAsync(ct).ConfigureAwait(false);
 
         var propertyMap = properties.ToDictionary(property => property.Id, property => property);
         var resourceProperties = new Dictionary<int, List<ResourcePropertyDto>>();
@@ -82,7 +82,7 @@ public sealed class ResourceCatalogService : IResourceCatalogService
 
     public async Task<IReadOnlyList<ResourcePropertyDto>> GetPropertiesAsync(CancellationToken ct)
     {
-        var properties = await _dataSource.GetPropertiesAsync(ct).ConfigureAwait(false);
+        var properties = await _queryService.GetPropertiesAsync(ct).ConfigureAwait(false);
         if (properties.Count == 0)
         {
             return Array.Empty<ResourcePropertyDto>();

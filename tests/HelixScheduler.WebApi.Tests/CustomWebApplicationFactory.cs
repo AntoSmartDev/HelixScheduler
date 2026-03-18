@@ -1,7 +1,6 @@
 using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability;
 using HelixScheduler.Infrastructure.Persistence.Entities;
-using HelixScheduler.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +19,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<IAvailabilityFilterQueryService>();
             services.RemoveAll<IAvailabilityAncestorQueryService>();
             services.RemoveAll<IAvailabilitySummaryQueryService>();
-            services.RemoveAll<IPropertyRepository>();
             services.RemoveAll<ITenantStore>();
 
             services.AddSingleton<FakeAvailabilityQueryService>();
@@ -28,7 +26,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton<IAvailabilityFilterQueryService>(sp => sp.GetRequiredService<FakeAvailabilityQueryService>());
             services.AddSingleton<IAvailabilityAncestorQueryService>(sp => sp.GetRequiredService<FakeAvailabilityQueryService>());
             services.AddSingleton<IAvailabilitySummaryQueryService>(sp => sp.GetRequiredService<FakeAvailabilityQueryService>());
-            services.AddSingleton<IPropertyRepository, FakePropertyRepository>();
             services.AddSingleton<ITenantStore, FakeTenantStore>();
         });
     }
@@ -238,36 +235,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             var defaultDays = (1 << (int)DayOfWeek.Monday) | (1 << (int)DayOfWeek.Wednesday);
             return (defaultDays, new TimeOnly(14, 0), new TimeOnly(18, 0));
-        }
-    }
-
-    private sealed class FakePropertyRepository : IPropertyRepository
-    {
-        public Task<IReadOnlyList<ResourceProperties>> ExpandPropertySubtreeAsync(int propertyId, CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<ResourceProperties>>(Array.Empty<ResourceProperties>());
-        }
-
-        public Task<IReadOnlyList<int>> GetResourceIdsByPropertiesAsync(
-            IReadOnlyCollection<int> propertyIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
-        }
-
-        public Task<IReadOnlyList<int>> GetResourceIdsByAllPropertiesAsync(
-            IReadOnlyCollection<int> propertyIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
-        }
-
-        public Task<IReadOnlyList<IReadOnlyList<int>>> GetResourceIdsByPropertySetsAsync(
-            IReadOnlyList<IReadOnlyList<int>> propertySets,
-            CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<IReadOnlyList<int>>>(
-                propertySets.Select(_ => (IReadOnlyList<int>)Array.Empty<int>()).ToList());
         }
     }
 

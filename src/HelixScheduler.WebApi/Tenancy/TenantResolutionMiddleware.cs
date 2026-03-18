@@ -1,7 +1,7 @@
 using System.Net.Mime;
 using System.Text.Json;
 using HelixScheduler.Application.Abstractions;
-using HelixScheduler.Infrastructure.Persistence.Repositories;
+using HelixScheduler.Infrastructure.Persistence.Stores;
 
 namespace HelixScheduler.WebApi.Tenancy;
 

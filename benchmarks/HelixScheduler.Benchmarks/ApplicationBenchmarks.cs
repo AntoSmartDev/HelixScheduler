@@ -23,7 +23,7 @@ public class ApplicationBenchmarks
     public void Setup()
     {
         var dataSource = new DemoAvailabilityQueryService();
-        var schemaSource = new DemoPropertySchemaDataSource();
+        var schemaSource = new DemoPropertySchemaQueryService();
         var schemaService = new PropertySchemaService(schemaSource);
         _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
         _request = Scenario.BuildRequest();
@@ -62,7 +62,7 @@ public class ApplicationBenchmarks
                     PropertyFilterGroups: new[]
                     {
                         new PropertyFilterGroup(
-                            new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                            new[] { DemoPropertySchemaQueryService.ImagingRootId },
                             MatchMode: "and",
                             IncludePropertyDescendants: true)
                     },
@@ -161,15 +161,15 @@ public class ApplicationBenchmarks
 
         private static readonly Dictionary<int, List<int>> PropertyLinks = new()
         {
-            [SiteAId] = new List<int> { DemoPropertySchemaDataSource.LocationMilanId, DemoPropertySchemaDataSource.AccreditationIsoId },
-            [SiteBId] = new List<int> { DemoPropertySchemaDataSource.LocationRomeId },
-            [Room1Id] = new List<int> { DemoPropertySchemaDataSource.OctId },
-            [Room2Id] = new List<int> { DemoPropertySchemaDataSource.MriId },
-            [Room3Id] = new List<int> { DemoPropertySchemaDataSource.UltrasoundId },
-            [Room4Id] = new List<int> { DemoPropertySchemaDataSource.OctId },
-            [Doctor7Id] = new List<int> { DemoPropertySchemaDataSource.OphthalmologyId },
-            [Doctor8Id] = new List<int> { DemoPropertySchemaDataSource.CardiologyId },
-            [Doctor9Id] = new List<int> { DemoPropertySchemaDataSource.CardiologyId }
+            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId },
+            [SiteBId] = new List<int> { DemoPropertySchemaQueryService.LocationRomeId },
+            [Room1Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
+            [Room2Id] = new List<int> { DemoPropertySchemaQueryService.MriId },
+            [Room3Id] = new List<int> { DemoPropertySchemaQueryService.UltrasoundId },
+            [Room4Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
+            [Doctor7Id] = new List<int> { DemoPropertySchemaQueryService.OphthalmologyId },
+            [Doctor8Id] = new List<int> { DemoPropertySchemaQueryService.CardiologyId },
+            [Doctor9Id] = new List<int> { DemoPropertySchemaQueryService.CardiologyId }
         };
 
         public Task<IReadOnlyList<RuleData>> GetRulesAsync(
@@ -207,7 +207,7 @@ public class ApplicationBenchmarks
 
         public Task<IReadOnlyList<PropertyNode>> ExpandPropertySubtreeAsync(int propertyId, CancellationToken ct)
         {
-            var nodes = DemoPropertySchemaDataSource.PropertyNodes;
+            var nodes = DemoPropertySchemaQueryService.PropertyNodes;
             var result = new List<PropertyNode>();
             var stack = new Stack<int>();
             stack.Push(propertyId);
@@ -303,7 +303,7 @@ public class ApplicationBenchmarks
         }
     }
 
-    private sealed class DemoPropertySchemaDataSource : IPropertySchemaDataSource
+    private sealed class DemoPropertySchemaQueryService : IPropertySchemaQueryService
     {
         public const int SpecializationRootId = 100;
         public const int OphthalmologyId = 101;

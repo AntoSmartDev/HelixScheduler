@@ -1,13 +1,13 @@
 using HelixScheduler.Application.PropertySchema;
 using Microsoft.EntityFrameworkCore;
 
-namespace HelixScheduler.Infrastructure.Persistence.Repositories;
+namespace HelixScheduler.Infrastructure.Persistence.QueryServices;
 
-public sealed class PropertySchemaDataSource : IPropertySchemaDataSource
+public sealed class PropertySchemaQueryService : IPropertySchemaQueryService
 {
     private readonly SchedulerDbContext _dbContext;
 
-    public PropertySchemaDataSource(SchedulerDbContext dbContext)
+    public PropertySchemaQueryService(SchedulerDbContext dbContext)
     {
         _dbContext = dbContext;
     }

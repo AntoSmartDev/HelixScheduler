@@ -4,16 +4,16 @@ namespace HelixScheduler.Application.PropertySchema;
 
 public sealed class PropertySchemaService : IPropertySchemaService
 {
-    private readonly IPropertySchemaDataSource _dataSource;
+    private readonly IPropertySchemaQueryService _queryService;
 
-    public PropertySchemaService(IPropertySchemaDataSource dataSource)
+    public PropertySchemaService(IPropertySchemaQueryService queryService)
     {
-        _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
     }
 
     public async Task<PropertySchemaResponse> GetSchemaAsync(CancellationToken ct)
     {
-        var nodes = await _dataSource.GetPropertyNodesAsync(ct).ConfigureAwait(false);
+        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
         if (nodes.Count == 0)
         {
             return new PropertySchemaResponse(
@@ -22,7 +22,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
                 Array.Empty<ResourceTypePropertyDto>());
         }
 
-        var typeLinks = await _dataSource.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
+        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
 
         var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
         var definitionIds = new HashSet<int>();
@@ -76,7 +76,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
             return;
         }
 
-        var nodes = await _dataSource.GetPropertyNodesAsync(ct).ConfigureAwait(false);
+        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
         var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
         var definitionIds = new HashSet<int>();
 
@@ -91,7 +91,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
             definitionIds.Add(ResolveDefinitionId(propertyId, nodeMap));
         }
 
-        var typeLinks = await _dataSource.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
+        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
         var typeDefinitionMap = new Dictionary<int, HashSet<int>>();
         for (var i = 0; i < typeLinks.Count; i++)
         {
@@ -104,7 +104,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
             defs.Add(link.PropertyDefinitionId);
         }
 
-        var assignments = await _dataSource.GetResourceTypeAssignmentsAsync(resourceIds, ct)
+        var assignments = await _queryService.GetResourceTypeAssignmentsAsync(resourceIds, ct)
             .ConfigureAwait(false);
 
         for (var i = 0; i < assignments.Count; i++)
@@ -137,7 +137,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
             return;
         }
 
-        var nodes = await _dataSource.GetPropertyNodesAsync(ct).ConfigureAwait(false);
+        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
         var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
         var definitionIds = new HashSet<int>();
 
@@ -152,7 +152,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
             definitionIds.Add(ResolveDefinitionId(propertyId, nodeMap));
         }
 
-        var typeLinks = await _dataSource.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
+        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
         var typeDefinitionMap = new Dictionary<int, HashSet<int>>();
         for (var i = 0; i < typeLinks.Count; i++)
         {
@@ -185,7 +185,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
         IReadOnlyList<int> resourceIds,
         CancellationToken ct)
     {
-        return _dataSource.GetResourceTypeAssignmentsAsync(resourceIds, ct);
+        return _queryService.GetResourceTypeAssignmentsAsync(resourceIds, ct);
     }
 
     private static int ResolveDefinitionId(

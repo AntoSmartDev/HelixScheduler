@@ -1,6 +1,6 @@
 namespace HelixScheduler.Application.PropertySchema;
 
-public interface IPropertySchemaDataSource
+public interface IPropertySchemaQueryService
 {
     Task<IReadOnlyList<PropertySchemaNode>> GetPropertyNodesAsync(CancellationToken ct);
     Task<IReadOnlyList<ResourceTypePropertyLink>> GetResourceTypePropertiesAsync(CancellationToken ct);

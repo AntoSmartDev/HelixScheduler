@@ -1,6 +1,6 @@
 namespace HelixScheduler.Application.ResourceCatalog;
 
-public interface IResourceCatalogDataSource
+public interface IResourceCatalogQueryService
 {
     Task<IReadOnlyList<ResourceCatalogResource>> GetResourcesAsync(
         bool onlySchedulable,

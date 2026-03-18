@@ -11,7 +11,7 @@ public sealed class FilterBatchingTests
     public async Task PropertyFilterGroups_With_Descendants_Use_Batched_PropertySet_Query()
     {
         var dataSource = new CountingAvailabilityQueryService();
-        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaQueryService());
         var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
@@ -21,7 +21,7 @@ public sealed class FilterBatchingTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { CountingPropertySchemaDataSource.SharedRootId, CountingPropertySchemaDataSource.SharedLeafAId },
+                    new[] { CountingPropertySchemaQueryService.SharedRootId, CountingPropertySchemaQueryService.SharedLeafAId },
                     MatchMode: "and",
                     IncludePropertyDescendants: true)
             },
@@ -40,7 +40,7 @@ public sealed class FilterBatchingTests
     public async Task Shared_Subtree_Expansion_Is_Reused_Across_Property_And_Ancestor_Filters()
     {
         var dataSource = new CountingAvailabilityQueryService();
-        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaQueryService());
         var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
@@ -50,7 +50,7 @@ public sealed class FilterBatchingTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { CountingPropertySchemaDataSource.SharedRootId },
+                    new[] { CountingPropertySchemaQueryService.SharedRootId },
                     MatchMode: "and",
                     IncludePropertyDescendants: true)
             },
@@ -58,8 +58,8 @@ public sealed class FilterBatchingTests
             AncestorFilters: new[]
             {
                 new AncestorPropertyFilter(
-                    ResourceTypeId: CountingPropertySchemaDataSource.AncestorTypeId,
-                    PropertyIds: new[] { CountingPropertySchemaDataSource.SharedRootId },
+                    ResourceTypeId: CountingPropertySchemaQueryService.AncestorTypeId,
+                    PropertyIds: new[] { CountingPropertySchemaQueryService.SharedRootId },
                     IncludePropertyDescendants: true)
             });
 
@@ -73,7 +73,7 @@ public sealed class FilterBatchingTests
     public async Task AncestorFilters_Use_Batched_PropertySet_Query()
     {
         var dataSource = new CountingAvailabilityQueryService();
-        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaQueryService());
         var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
@@ -84,8 +84,8 @@ public sealed class FilterBatchingTests
             AncestorFilters: new[]
             {
                 new AncestorPropertyFilter(
-                    ResourceTypeId: CountingPropertySchemaDataSource.AncestorTypeId,
-                    PropertyIds: new[] { CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedLeafBId },
+                    ResourceTypeId: CountingPropertySchemaQueryService.AncestorTypeId,
+                    PropertyIds: new[] { CountingPropertySchemaQueryService.SharedLeafAId, CountingPropertySchemaQueryService.SharedLeafBId },
                     MatchMode: "and")
             });
 
@@ -100,7 +100,7 @@ public sealed class FilterBatchingTests
     public async Task IncludeResourceAncestors_Uses_Single_Load_For_Deep_Hierarchy()
     {
         var dataSource = new CountingAvailabilityQueryService();
-        var schemaService = new PropertySchemaService(new CountingPropertySchemaDataSource());
+        var schemaService = new PropertySchemaService(new CountingPropertySchemaQueryService());
         var service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
 
         var request = new AvailabilityComputeRequest(
@@ -138,8 +138,8 @@ public sealed class FilterBatchingTests
         private static readonly IReadOnlyDictionary<int, IReadOnlyList<int>> PropertyLinks =
             new Dictionary<int, IReadOnlyList<int>>
             {
-                [AncestorId] = new[] { CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedLeafBId },
-                [ResourceId] = new[] { CountingPropertySchemaDataSource.SharedLeafAId }
+                [AncestorId] = new[] { CountingPropertySchemaQueryService.SharedLeafAId, CountingPropertySchemaQueryService.SharedLeafBId },
+                [ResourceId] = new[] { CountingPropertySchemaQueryService.SharedLeafAId }
             };
 
         public Task<IReadOnlyList<RuleData>> GetRulesAsync(
@@ -190,16 +190,16 @@ public sealed class FilterBatchingTests
             CancellationToken ct)
         {
             ExpandPropertySubtreeCalls++;
-            if (propertyId != CountingPropertySchemaDataSource.SharedRootId)
+            if (propertyId != CountingPropertySchemaQueryService.SharedRootId)
             {
                 return Task.FromResult<IReadOnlyList<PropertyNode>>(Array.Empty<PropertyNode>());
             }
 
             return Task.FromResult<IReadOnlyList<PropertyNode>>(new[]
             {
-                new PropertyNode(CountingPropertySchemaDataSource.SharedRootId, null, "Shared", "Shared", null),
-                new PropertyNode(CountingPropertySchemaDataSource.SharedLeafAId, CountingPropertySchemaDataSource.SharedRootId, "Shared", "Leaf A", 1),
-                new PropertyNode(CountingPropertySchemaDataSource.SharedLeafBId, CountingPropertySchemaDataSource.SharedRootId, "Shared", "Leaf B", 2)
+                new PropertyNode(CountingPropertySchemaQueryService.SharedRootId, null, "Shared", "Shared", null),
+                new PropertyNode(CountingPropertySchemaQueryService.SharedLeafAId, CountingPropertySchemaQueryService.SharedRootId, "Shared", "Leaf A", 1),
+                new PropertyNode(CountingPropertySchemaQueryService.SharedLeafBId, CountingPropertySchemaQueryService.SharedRootId, "Shared", "Leaf B", 2)
             });
         }
 
@@ -271,7 +271,7 @@ public sealed class FilterBatchingTests
         }
     }
 
-    private sealed class CountingPropertySchemaDataSource : IPropertySchemaDataSource
+    private sealed class CountingPropertySchemaQueryService : IPropertySchemaQueryService
     {
         public const int AncestorTypeId = 1;
         public const int ResourceTypeId = 2;

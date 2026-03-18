@@ -13,7 +13,7 @@ public sealed class AncestorFilterTests
     public AncestorFilterTests()
     {
         var dataSource = new FakeAvailabilityQueryService();
-        var schemaSource = new FakePropertySchemaDataSource();
+        var schemaSource = new FakePropertySchemaQueryService();
         var schemaService = new PropertySchemaService(schemaSource);
         _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
     }
@@ -233,7 +233,7 @@ public sealed class AncestorFilterTests
             int propertyId,
             CancellationToken ct)
         {
-            var nodes = FakePropertySchemaDataSource.PropertyNodes;
+            var nodes = FakePropertySchemaQueryService.PropertyNodes;
             var result = new List<PropertyNode>();
             var stack = new Stack<int>();
             stack.Push(propertyId);
@@ -368,7 +368,7 @@ public sealed class AncestorFilterTests
         }
     }
 
-    private sealed class FakePropertySchemaDataSource : IPropertySchemaDataSource
+    private sealed class FakePropertySchemaQueryService : IPropertySchemaQueryService
     {
         public static readonly List<PropertySchemaNode> PropertyNodes = new()
         {

@@ -2,7 +2,7 @@ using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace HelixScheduler.Infrastructure.Persistence.Repositories;
+namespace HelixScheduler.Infrastructure.Persistence.Stores;
 
 public sealed class TenantStore : ITenantStore
 {

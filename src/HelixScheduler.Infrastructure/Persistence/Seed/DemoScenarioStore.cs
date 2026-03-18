@@ -3,7 +3,7 @@ using HelixScheduler.Application.Demo;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace HelixScheduler.Infrastructure.Persistence.Repositories;
+namespace HelixScheduler.Infrastructure.Persistence.Seed;
 
 public sealed class DemoScenarioStore : IDemoScenarioStore
 {

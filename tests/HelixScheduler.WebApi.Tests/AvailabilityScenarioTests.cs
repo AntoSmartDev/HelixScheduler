@@ -17,7 +17,7 @@ public sealed class AvailabilityScenarioTests
     public AvailabilityScenarioTests()
     {
         var dataSource = new DemoAvailabilityQueryService();
-        var schemaSource = new DemoPropertySchemaDataSource();
+        var schemaSource = new DemoPropertySchemaQueryService();
         var schemaService = new PropertySchemaService(schemaSource);
         _service = new AvailabilityService(dataSource, dataSource, dataSource, schemaService, new AvailabilityEngine());
     }
@@ -53,8 +53,8 @@ public sealed class AvailabilityScenarioTests
             AncestorFilters: new[]
             {
                 new AncestorPropertyFilter(
-                    ResourceTypeId: DemoPropertySchemaDataSource.SiteTypeId,
-                    PropertyIds: new[] { DemoPropertySchemaDataSource.LocationMilanId })
+                    ResourceTypeId: DemoPropertySchemaQueryService.SiteTypeId,
+                    PropertyIds: new[] { DemoPropertySchemaQueryService.LocationMilanId })
             });
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
@@ -72,8 +72,8 @@ public sealed class AvailabilityScenarioTests
             AncestorFilters: new[]
             {
                 new AncestorPropertyFilter(
-                    ResourceTypeId: DemoPropertySchemaDataSource.SiteTypeId,
-                    PropertyIds: new[] { DemoPropertySchemaDataSource.LocationMilanId })
+                    ResourceTypeId: DemoPropertySchemaQueryService.SiteTypeId,
+                    PropertyIds: new[] { DemoPropertySchemaQueryService.LocationMilanId })
             });
 
         var result = await _service.ComputeAsync(request, CancellationToken.None);
@@ -173,7 +173,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    new[] { DemoPropertySchemaQueryService.ImagingRootId },
                     MatchMode: "and",
                     IncludePropertyDescendants: true)
             },
@@ -202,7 +202,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    new[] { DemoPropertySchemaQueryService.ImagingRootId },
                     MatchMode: "and")
             },
             ResourceOrGroups: new[]
@@ -230,7 +230,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.OphthalmologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    new[] { DemoPropertySchemaQueryService.OphthalmologyId, DemoPropertySchemaQueryService.CardiologyId },
                     MatchMode: "or")
             },
             ResourceOrGroups: new[]
@@ -257,10 +257,10 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.LocationMilanId, DemoPropertySchemaDataSource.LocationRomeId },
+                    new[] { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.LocationRomeId },
                     MatchMode: "or"),
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.AccreditationIsoId },
+                    new[] { DemoPropertySchemaQueryService.AccreditationIsoId },
                     MatchMode: "and")
             },
             ResourceOrGroups: new[]
@@ -291,7 +291,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.ImagingRootId },
+                    new[] { DemoPropertySchemaQueryService.ImagingRootId },
                     MatchMode: "or",
                     IncludePropertyDescendants: true)
             },
@@ -320,7 +320,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.CardiologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    new[] { DemoPropertySchemaQueryService.CardiologyId, DemoPropertySchemaQueryService.CardiologyId },
                     MatchMode: "or")
             },
             ResourceOrGroups: new[]
@@ -346,7 +346,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.ImagingRootId, DemoPropertySchemaDataSource.OctId },
+                    new[] { DemoPropertySchemaQueryService.ImagingRootId, DemoPropertySchemaQueryService.OctId },
                     MatchMode: "or",
                     IncludePropertyDescendants: true)
             },
@@ -375,7 +375,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.OphthalmologyId, DemoPropertySchemaDataSource.CardiologyId },
+                    new[] { DemoPropertySchemaQueryService.OphthalmologyId, DemoPropertySchemaQueryService.CardiologyId },
                     MatchMode: "and")
             },
             ResourceOrGroups: new[]
@@ -402,7 +402,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.LocationMilanId },
+                    new[] { DemoPropertySchemaQueryService.LocationMilanId },
                     MatchMode: "and")
             },
             ResourceOrGroups: new[]
@@ -433,7 +433,7 @@ public sealed class AvailabilityScenarioTests
             PropertyFilterGroups: new[]
             {
                 new PropertyFilterGroup(
-                    new[] { DemoPropertySchemaDataSource.OphthalmologyId },
+                    new[] { DemoPropertySchemaQueryService.OphthalmologyId },
                     MatchMode: "xor")
             },
             ResourceOrGroups: new[]
@@ -544,15 +544,15 @@ public sealed class AvailabilityScenarioTests
 
         private static readonly Dictionary<int, List<int>> PropertyLinks = new()
         {
-            [SiteAId] = new List<int> { DemoPropertySchemaDataSource.LocationMilanId, DemoPropertySchemaDataSource.AccreditationIsoId },
-            [SiteBId] = new List<int> { DemoPropertySchemaDataSource.LocationRomeId },
-            [Room1Id] = new List<int> { DemoPropertySchemaDataSource.OctId },
-            [Room2Id] = new List<int> { DemoPropertySchemaDataSource.MriId },
-            [Room3Id] = new List<int> { DemoPropertySchemaDataSource.UltrasoundId },
-            [Room4Id] = new List<int> { DemoPropertySchemaDataSource.OctId },
-            [Doctor7Id] = new List<int> { DemoPropertySchemaDataSource.OphthalmologyId },
-            [Doctor8Id] = new List<int> { DemoPropertySchemaDataSource.CardiologyId },
-            [Doctor9Id] = new List<int> { DemoPropertySchemaDataSource.CardiologyId }
+            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId },
+            [SiteBId] = new List<int> { DemoPropertySchemaQueryService.LocationRomeId },
+            [Room1Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
+            [Room2Id] = new List<int> { DemoPropertySchemaQueryService.MriId },
+            [Room3Id] = new List<int> { DemoPropertySchemaQueryService.UltrasoundId },
+            [Room4Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
+            [Doctor7Id] = new List<int> { DemoPropertySchemaQueryService.OphthalmologyId },
+            [Doctor8Id] = new List<int> { DemoPropertySchemaQueryService.CardiologyId },
+            [Doctor9Id] = new List<int> { DemoPropertySchemaQueryService.CardiologyId }
         };
 
         public Task<IReadOnlyList<RuleData>> GetRulesAsync(
@@ -590,7 +590,7 @@ public sealed class AvailabilityScenarioTests
 
         public Task<IReadOnlyList<PropertyNode>> ExpandPropertySubtreeAsync(int propertyId, CancellationToken ct)
         {
-            var nodes = DemoPropertySchemaDataSource.PropertyNodes;
+            var nodes = DemoPropertySchemaQueryService.PropertyNodes;
             var result = new List<PropertyNode>();
             var stack = new Stack<int>();
             stack.Push(propertyId);
@@ -686,7 +686,7 @@ public sealed class AvailabilityScenarioTests
         }
     }
 
-    private sealed class DemoPropertySchemaDataSource : IPropertySchemaDataSource
+    private sealed class DemoPropertySchemaQueryService : IPropertySchemaQueryService
     {
         public const int SiteTypeId = 10;
         public const int FloorTypeId = 11;
