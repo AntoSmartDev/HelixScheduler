@@ -4,19 +4,10 @@ namespace HelixScheduler.Application.Availability;
 
 public sealed class AvailabilityService : IAvailabilityService
 {
-    private const int MaxRangeDays = 31;
-    private const int MaxRequiredResources = 10;
-    private const int MaxOrGroups = 5;
-    private const int MaxOrGroupItems = 10;
-    private const int MaxTotalResources = 20;
-    private const int MaxAncestorFilters = 5;
-    private const int MaxPropertyFilterGroups = 5;
-    private const int MaxPropertyFilterIdsPerGroup = 10;
-
     private readonly IAvailabilityComputeQueryService _computeQueryService;
-    private readonly IAvailabilityFilterQueryService _filterQueryService;
-    private readonly IAvailabilityAncestorQueryService _ancestorQueryService;
-    private readonly PropertySchema.IPropertySchemaService _propertySchemaService;
+    private readonly AvailabilityRequestValidator _requestValidator;
+    private readonly AvailabilityPropertyFilterEvaluator _propertyFilterEvaluator;
+    private readonly AvailabilityAncestorHandler _ancestorHandler;
     private readonly AvailabilityEngine _engine;
 
     public AvailabilityService(
@@ -27,10 +18,16 @@ public sealed class AvailabilityService : IAvailabilityService
         AvailabilityEngine engine)
     {
         _computeQueryService = computeQueryService ?? throw new ArgumentNullException(nameof(computeQueryService));
-        _filterQueryService = filterQueryService ?? throw new ArgumentNullException(nameof(filterQueryService));
-        _ancestorQueryService = ancestorQueryService ?? throw new ArgumentNullException(nameof(ancestorQueryService));
-        _propertySchemaService = propertySchemaService ?? throw new ArgumentNullException(nameof(propertySchemaService));
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+
+        _propertyFilterEvaluator = new AvailabilityPropertyFilterEvaluator(
+            filterQueryService ?? throw new ArgumentNullException(nameof(filterQueryService)));
+        _requestValidator = new AvailabilityRequestValidator(
+            propertySchemaService ?? throw new ArgumentNullException(nameof(propertySchemaService)));
+        _ancestorHandler = new AvailabilityAncestorHandler(
+            ancestorQueryService ?? throw new ArgumentNullException(nameof(ancestorQueryService)),
+            propertySchemaService,
+            _propertyFilterEvaluator);
     }
 
     public async Task<AvailabilityComputeResponse> ComputeAsync(
@@ -42,12 +39,10 @@ public sealed class AvailabilityService : IAvailabilityService
             throw new ArgumentNullException(nameof(request));
         }
 
-        ValidateRequest(request);
-        await ValidatePropertySchemaAsync(request, ct).ConfigureAwait(false);
-        await ValidateAncestorFiltersAsync(request, ct).ConfigureAwait(false);
+        await _requestValidator.ValidateAsync(request, ct).ConfigureAwait(false);
 
         var computation = await ComputeAvailabilityAsync(request, ct).ConfigureAwait(false);
-        var effectiveSlots = ApplySlotDuration(computation.Result.Slots, request);
+        var effectiveSlots = AvailabilitySlotPostProcessor.ApplySlotDuration(computation.Result.Slots, request);
         if (!request.Explain)
         {
             return new AvailabilityComputeResponse(
@@ -58,240 +53,16 @@ public sealed class AvailabilityService : IAvailabilityService
         var explanations = new List<AvailabilityExplanation>();
         if (effectiveSlots.Count == 0 && computation.Result.Slots.Count == 0)
         {
-            explanations.Add(BuildEmptyExplanation(computation, request.FromDate, request.ToDate));
+            explanations.Add(AvailabilitySlotPostProcessor.BuildEmptyExplanation(
+                computation.Result,
+                computation.HasPositiveRules,
+                computation.HasNegativeRules,
+                computation.HasBusySlots,
+                request.FromDate,
+                request.ToDate));
         }
 
         return new AvailabilityComputeResponse(effectiveSlots, explanations);
-    }
-
-    private async Task ValidatePropertySchemaAsync(
-        AvailabilityComputeRequest request,
-        CancellationToken ct)
-    {
-        var propertyIds = CollectPropertyFilterIds(request);
-        if (propertyIds.Count == 0)
-        {
-            return;
-        }
-
-        var resourceIds = new HashSet<int>(request.RequiredResourceIds);
-        var orGroups = request.ResourceOrGroups ?? Array.Empty<IReadOnlyList<int>>();
-        for (var groupIndex = 0; groupIndex < orGroups.Count; groupIndex++)
-        {
-            var group = orGroups[groupIndex];
-            for (var i = 0; i < group.Count; i++)
-            {
-                resourceIds.Add(group[i]);
-            }
-        }
-
-        await _propertySchemaService.ValidatePropertyFiltersAsync(
-            resourceIds.ToList(),
-            propertyIds,
-            ct).ConfigureAwait(false);
-    }
-
-    private async Task ValidateAncestorFiltersAsync(
-        AvailabilityComputeRequest request,
-        CancellationToken ct)
-    {
-        if (request.AncestorFilters == null || request.AncestorFilters.Count == 0)
-        {
-            return;
-        }
-
-        for (var i = 0; i < request.AncestorFilters.Count; i++)
-        {
-            var filter = request.AncestorFilters[i];
-            if (filter.PropertyIds == null || filter.PropertyIds.Count == 0)
-            {
-                continue;
-            }
-
-            var propertyIds = filter.PropertyIds.Distinct().ToList();
-            await _propertySchemaService.ValidatePropertyFiltersForTypeAsync(
-                filter.ResourceTypeId,
-                propertyIds,
-                ct).ConfigureAwait(false);
-        }
-    }
-
-    private static void ValidateRequest(AvailabilityComputeRequest request)
-    {
-        if (request.RequiredResourceIds == null)
-        {
-            throw new AvailabilityRequestException("resourceIds is required and must contain at least one item.");
-        }
-
-        if (request.FromDate > request.ToDate)
-        {
-            throw new AvailabilityRequestException("fromDate must be less than or equal to toDate.");
-        }
-
-        var inclusiveDays = (request.ToDate.DayNumber - request.FromDate.DayNumber) + 1;
-        if (inclusiveDays > MaxRangeDays)
-        {
-            throw new AvailabilityRequestException("Date range must be 31 days or less.");
-        }
-
-        if (HasNonPositive(request.RequiredResourceIds))
-        {
-            throw new AvailabilityRequestException("resourceIds must contain only positive integers.");
-        }
-
-        var distinctRequired = request.RequiredResourceIds.Distinct().ToList();
-        if (distinctRequired.Count > MaxRequiredResources)
-        {
-            throw new AvailabilityRequestException("resourceIds must contain at most 10 items.");
-        }
-
-        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
-        {
-            if (request.PropertyFilterGroups.Count > MaxPropertyFilterGroups)
-            {
-                throw new AvailabilityRequestException("propertyFilterGroups must contain at most 5 groups.");
-            }
-
-            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
-            {
-                var group = request.PropertyFilterGroups[i];
-                if (group == null)
-                {
-                    throw new AvailabilityRequestException("propertyFilterGroups cannot contain null entries.");
-                }
-
-                if (group.PropertyIds == null || group.PropertyIds.Count == 0)
-                {
-                    throw new AvailabilityRequestException("propertyFilterGroups requires propertyIds.");
-                }
-
-                if (HasNonPositive(group.PropertyIds))
-                {
-                    throw new AvailabilityRequestException("propertyFilterGroups propertyIds must be positive integers.");
-                }
-
-                if (group.PropertyIds.Count > MaxPropertyFilterIdsPerGroup)
-                {
-                    throw new AvailabilityRequestException("propertyFilterGroups propertyIds must contain at most 10 items.");
-                }
-
-                if (NormalizePropertyMatchMode(group.MatchMode) == null)
-                {
-                    throw new AvailabilityRequestException("propertyFilterGroups matchMode must be 'or' or 'and'.");
-                }
-            }
-        }
-
-        var orGroups = request.ResourceOrGroups ?? Array.Empty<IReadOnlyList<int>>();
-        if (orGroups.Count > MaxOrGroups)
-        {
-            throw new AvailabilityRequestException("orGroups must contain at most 5 groups.");
-        }
-
-        var usedIds = new HashSet<int>(distinctRequired);
-        for (var groupIndex = 0; groupIndex < orGroups.Count; groupIndex++)
-        {
-            var group = orGroups[groupIndex];
-            if (group == null || group.Count == 0)
-            {
-                throw new AvailabilityRequestException("orGroups contains an empty group.");
-            }
-
-            if (group.Count > MaxOrGroupItems)
-            {
-                throw new AvailabilityRequestException("orGroups groups must contain at most 10 items.");
-            }
-
-            var groupSet = new HashSet<int>();
-            for (var i = 0; i < group.Count; i++)
-            {
-                var value = group[i];
-                if (value <= 0)
-                {
-                    throw new AvailabilityRequestException("orGroups must contain only positive integers.");
-                }
-
-                if (!groupSet.Add(value))
-                {
-                    continue;
-                }
-
-                usedIds.Add(value);
-            }
-
-            if (groupSet.Count == 0)
-            {
-                throw new AvailabilityRequestException("orGroups group must contain at least one unique resourceId.");
-            }
-        }
-
-        if (usedIds.Count == 0)
-        {
-            throw new AvailabilityRequestException("resourceIds is required and must contain at least one item.");
-        }
-
-        if (usedIds.Count > MaxTotalResources)
-        {
-            throw new AvailabilityRequestException("Total resources must be 20 or less.");
-        }
-
-        var includeAncestors = request.IncludeResourceAncestors
-            || (request.AncestorFilters?.Count > 0);
-
-        if (includeAncestors)
-        {
-            var mode = NormalizeAncestorMode(request.AncestorMode);
-            if (mode == null)
-            {
-                throw new AvailabilityRequestException("ancestorMode must be 'perGroup' or 'global'.");
-            }
-        }
-
-        if (request.AncestorFilters != null && request.AncestorFilters.Count > 0)
-        {
-            if (request.AncestorFilters.Count > MaxAncestorFilters)
-            {
-                throw new AvailabilityRequestException("ancestorFilters must contain at most 5 entries.");
-            }
-
-            for (var i = 0; i < request.AncestorFilters.Count; i++)
-            {
-                var filter = request.AncestorFilters[i];
-                if (filter.ResourceTypeId <= 0)
-                {
-                    throw new AvailabilityRequestException("ancestorFilters requires positive resourceTypeId.");
-                }
-
-                if (filter.PropertyIds == null || filter.PropertyIds.Count == 0)
-                {
-                    throw new AvailabilityRequestException("ancestorFilters requires propertyIds.");
-                }
-
-                if (HasNonPositive(filter.PropertyIds))
-                {
-                    throw new AvailabilityRequestException("ancestorFilters propertyIds must be positive integers.");
-                }
-
-                if (NormalizeMatchMode(filter.MatchMode) == null)
-                {
-                    throw new AvailabilityRequestException("ancestorFilters matchMode must be 'or' or 'and'.");
-                }
-
-                if (NormalizeAncestorScope(filter.Scope) == null)
-                {
-                    throw new AvailabilityRequestException(
-                        "ancestorFilters scope must be 'anyAncestor', 'directParent', or 'nearestOfType'.");
-                }
-            }
-        }
-
-        if (request.SlotDurationMinutes.HasValue)
-        {
-            if (request.SlotDurationMinutes.Value <= 0 || request.SlotDurationMinutes.Value > 1440)
-            {
-                throw new AvailabilityRequestException("slotDurationMinutes must be between 1 and 1440.");
-            }
-        }
     }
 
     private async Task<AvailabilityComputation> ComputeAvailabilityAsync(
@@ -301,7 +72,7 @@ public sealed class AvailabilityService : IAvailabilityService
         var requiredIds = request.RequiredResourceIds.Distinct().ToList();
         requiredIds.Sort();
 
-        var orGroups = NormalizeOrGroups(request.ResourceOrGroups);
+        var orGroups = AvailabilityRequestNormalization.NormalizeOrGroups(request.ResourceOrGroups);
         var filteredResourceIds = new HashSet<int>(requiredIds);
         for (var groupIndex = 0; groupIndex < orGroups.Count; groupIndex++)
         {
@@ -313,12 +84,12 @@ public sealed class AvailabilityService : IAvailabilityService
 
         HashSet<int>? propertyFiltered = null;
         var propertyExecutionContext = new PropertyFilterExecutionContext();
-        var propertyGroups = NormalizePropertyFilterGroups(request);
+        var propertyGroups = _propertyFilterEvaluator.NormalizePropertyFilterGroups(request);
         if (propertyGroups.Count > 0)
         {
             for (var i = 0; i < propertyGroups.Count; i++)
             {
-                var groupMatch = await EvaluatePropertyFilterGroupAsync(
+                var groupMatch = await _propertyFilterEvaluator.EvaluatePropertyFilterGroupAsync(
                     propertyGroups[i],
                     propertyExecutionContext,
                     ct).ConfigureAwait(false);
@@ -358,7 +129,7 @@ public sealed class AvailabilityService : IAvailabilityService
         var includeAncestors = request.IncludeResourceAncestors
             || (request.AncestorFilters?.Count > 0);
         var ancestorExpansion = includeAncestors
-            ? await BuildAncestorExpansionAsync(filteredResourceIds, request.AncestorRelationTypes, ct)
+            ? await _ancestorHandler.BuildAncestorExpansionAsync(filteredResourceIds, request.AncestorRelationTypes, ct)
                 .ConfigureAwait(false)
             : AncestorExpansion.Empty;
 
@@ -392,7 +163,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
         if (request.AncestorFilters != null && request.AncestorFilters.Count > 0)
         {
-            var filterResult = await ApplyAncestorFiltersAsync(
+            var filterResult = await _ancestorHandler.ApplyAncestorFiltersAsync(
                 filteredRequiredIds,
                 filteredOrGroups,
                 ancestorExpansion,
@@ -420,7 +191,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
         if (includeAncestors)
         {
-            var ancestorIds = CollectAncestors(filteredResourceIds, ancestorExpansion);
+            var ancestorIds = _ancestorHandler.CollectAncestors(filteredResourceIds, ancestorExpansion);
             filteredResourceIds.UnionWith(ancestorIds);
         }
 
@@ -458,7 +229,7 @@ public sealed class AvailabilityService : IAvailabilityService
                     continue;
                 }
 
-                var model = new AvailabilityRule(
+                var availabilityRule = new AvailabilityRule(
                     rule.Id,
                     (RuleKind)rule.Kind,
                     rule.IsExclude,
@@ -472,17 +243,17 @@ public sealed class AvailabilityService : IAvailabilityService
                     rule.IntervalDays,
                     resourceId);
 
-                if (!model.IsExclude && RuleAppliesToPeriod(model, period))
+                if (!availabilityRule.IsExclude && AvailabilityRuleApplicability.RuleAppliesToPeriod(availabilityRule, period))
                 {
                     hasPositive = true;
                 }
 
-                if (model.IsExclude && RuleAppliesToPeriod(model, period))
+                if (availabilityRule.IsExclude && AvailabilityRuleApplicability.RuleAppliesToPeriod(availabilityRule, period))
                 {
                     hasNegative = true;
                 }
 
-                availabilityRules.Add(model);
+                availabilityRules.Add(availabilityRule);
             }
         }
 
@@ -511,13 +282,13 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         var inputs = new AvailabilityInputs(availabilityRules, busySlots, resourceCapacities);
-        var ancestorMode = NormalizeAncestorMode(request.AncestorMode) ?? "perGroup";
+        var ancestorMode = AvailabilityRequestNormalization.NormalizeAncestorMode(request.AncestorMode) ?? "perGroup";
         IReadOnlyDictionary<int, List<UtcSlot>>? perResourceAvailability = null;
 
         if (includeAncestors && ancestorMode == "perGroup")
         {
             perResourceAvailability = BuildPerResourceAvailability(period, resourceIdList, inputs);
-            var requiredWithAncestors = ExpandRequiredAncestors(filteredRequiredIds, ancestorExpansion);
+            var requiredWithAncestors = _ancestorHandler.ExpandRequiredAncestors(filteredRequiredIds, ancestorExpansion);
             if (filteredOrGroups.Count == 0)
             {
                 var query = new AvailabilityQuery(period, requiredWithAncestors);
@@ -536,7 +307,7 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         var globalRequired = includeAncestors
-            ? ExpandRequiredAncestors(filteredRequiredIds, ancestorExpansion)
+            ? _ancestorHandler.ExpandRequiredAncestors(filteredRequiredIds, ancestorExpansion)
             : filteredRequiredIds;
 
         if (globalRequired.Count == 0 && filteredOrGroups.Count > 0)
@@ -550,623 +321,6 @@ public sealed class AvailabilityService : IAvailabilityService
         var resultWithRequired = _engine.Compute(queryWithRequired, inputs);
 
         return new AvailabilityComputation(resultWithRequired, hasPositive, hasNegative, busySlots.Count > 0);
-    }
-
-    private static List<int> CollectPropertyFilterIds(AvailabilityComputeRequest request)
-    {
-        var ids = new List<int>();
-        var seen = new HashSet<int>();
-
-        if (request.PropertyFilterGroups == null || request.PropertyFilterGroups.Count == 0)
-        {
-            return ids;
-        }
-
-        for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
-        {
-            var group = request.PropertyFilterGroups[i];
-            if (group?.PropertyIds == null)
-            {
-                continue;
-            }
-
-            var groupIds = group.PropertyIds;
-            for (var j = 0; j < groupIds.Count; j++)
-            {
-                var value = groupIds[j];
-                if (seen.Add(value))
-                {
-                    ids.Add(value);
-                }
-            }
-        }
-
-        return ids;
-    }
-
-    private static List<PropertyFilterGroup> NormalizePropertyFilterGroups(AvailabilityComputeRequest request)
-    {
-        var groups = new List<PropertyFilterGroup>();
-
-        if (request.PropertyFilterGroups != null && request.PropertyFilterGroups.Count > 0)
-        {
-            for (var i = 0; i < request.PropertyFilterGroups.Count; i++)
-            {
-                var group = request.PropertyFilterGroups[i];
-                if (group?.PropertyIds == null || group.PropertyIds.Count == 0)
-                {
-                    continue;
-                }
-
-                var matchMode = NormalizePropertyMatchMode(group.MatchMode) ?? "and";
-                var ids = DistinctPropertyIds(group.PropertyIds);
-                if (ids.Count == 0)
-                {
-                    continue;
-                }
-
-                groups.Add(new PropertyFilterGroup(ids, matchMode, group.IncludePropertyDescendants));
-            }
-
-            return groups;
-        }
-        return groups;
-    }
-
-    private async Task<HashSet<int>> EvaluatePropertyFilterGroupAsync(
-        PropertyFilterGroup group,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        var matchMode = NormalizePropertyMatchMode(group.MatchMode) ?? "and";
-        var propertyIds = group.PropertyIds;
-        if (propertyIds == null || propertyIds.Count == 0)
-        {
-            return new HashSet<int>();
-        }
-
-        if (matchMode == "or")
-        {
-            return await EvaluateOrPropertyGroupAsync(group, context, ct).ConfigureAwait(false);
-        }
-
-        return await EvaluateAndPropertyGroupAsync(group, context, ct).ConfigureAwait(false);
-    }
-
-    private async Task<HashSet<int>> EvaluateOrPropertyGroupAsync(
-        PropertyFilterGroup group,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        if (!group.IncludePropertyDescendants)
-        {
-            var matches = await _filterQueryService
-                .GetResourceIdsByPropertiesAsync(group.PropertyIds, ct)
-                .ConfigureAwait(false);
-            return new HashSet<int>(matches);
-        }
-
-        var expandedIds = new HashSet<int>();
-        for (var i = 0; i < group.PropertyIds.Count; i++)
-        {
-            var propertyId = group.PropertyIds[i];
-            var expanded = await ExpandPropertyIdsCachedAsync(propertyId, context, ct)
-                .ConfigureAwait(false);
-            for (var j = 0; j < expanded.Count; j++)
-            {
-                expandedIds.Add(expanded[j]);
-            }
-        }
-
-        if (expandedIds.Count == 0)
-        {
-            return new HashSet<int>();
-        }
-
-        var resourceMatches = await _filterQueryService
-            .GetResourceIdsByPropertiesAsync(expandedIds.ToList(), ct)
-            .ConfigureAwait(false);
-        return new HashSet<int>(resourceMatches);
-    }
-
-    private async Task<HashSet<int>> EvaluateAndPropertyGroupAsync(
-        PropertyFilterGroup group,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        if (!group.IncludePropertyDescendants && group.PropertyIds.Count > 1)
-        {
-            var resourceMatches = await _filterQueryService
-                .GetResourceIdsByAllPropertiesAsync(group.PropertyIds, ct)
-                .ConfigureAwait(false);
-            return new HashSet<int>(resourceMatches);
-        }
-
-        var effectivePropertySets = new List<IReadOnlyList<int>>(group.PropertyIds.Count);
-        for (var i = 0; i < group.PropertyIds.Count; i++)
-        {
-            var propertyId = group.PropertyIds[i];
-            IReadOnlyList<int> effectiveIds;
-            if (group.IncludePropertyDescendants)
-            {
-                effectiveIds = await ExpandPropertyIdsCachedAsync(propertyId, context, ct)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                effectiveIds = new List<int> { propertyId };
-            }
-
-            effectivePropertySets.Add(effectiveIds);
-        }
-
-        var matchSets = await GetPropertyMatchSetsAsync(effectivePropertySets, context, ct).ConfigureAwait(false);
-        HashSet<int>? groupMatch = null;
-        for (var i = 0; i < matchSets.Count; i++)
-        {
-            var matchSet = matchSets[i];
-
-            if (groupMatch == null)
-            {
-                groupMatch = new HashSet<int>(matchSet);
-            }
-            else
-            {
-                groupMatch.IntersectWith(matchSet);
-                if (groupMatch.Count == 0)
-                {
-                    return new HashSet<int>();
-                }
-            }
-        }
-
-        return groupMatch ?? new HashSet<int>();
-    }
-
-    private static List<int> DistinctPropertyIds(IReadOnlyList<int> propertyIds)
-    {
-        var distinct = new List<int>(propertyIds.Count);
-        var seen = new HashSet<int>();
-        for (var i = 0; i < propertyIds.Count; i++)
-        {
-            var value = propertyIds[i];
-            if (seen.Add(value))
-            {
-                distinct.Add(value);
-            }
-        }
-
-        distinct.Sort();
-        return distinct;
-    }
-
-    private async Task<IReadOnlyList<int>> ExpandPropertyIdsCachedAsync(
-        int propertyId,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        if (context.ExpandedPropertyIds.TryGetValue(propertyId, out var cached))
-        {
-            return cached;
-        }
-
-        var expanded = await ExpandPropertyIdsAsync(propertyId, ct).ConfigureAwait(false);
-        context.ExpandedPropertyIds[propertyId] = expanded;
-        return expanded;
-    }
-
-    private static HashSet<int> CollectAncestors(
-        IReadOnlyCollection<int> resourceIds,
-        AncestorExpansion expansion)
-    {
-        if (resourceIds.Count == 0 || expansion.AncestorMap.Count == 0)
-        {
-            return new HashSet<int>();
-        }
-
-        var result = new HashSet<int>();
-        foreach (var resourceId in resourceIds)
-        {
-            if (expansion.AncestorMap.TryGetValue(resourceId, out var ancestors))
-            {
-                result.UnionWith(ancestors);
-            }
-        }
-
-        return result;
-    }
-
-    private async Task<AncestorFilterResult> ApplyAncestorFiltersAsync(
-        IReadOnlyList<int> requiredIds,
-        IReadOnlyList<List<int>> orGroups,
-        AncestorExpansion expansion,
-        IReadOnlyList<AncestorPropertyFilter> filters,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        var normalizedFilters = NormalizeAncestorFilters(filters);
-        if (normalizedFilters.Count == 0)
-        {
-            return new AncestorFilterResult(requiredIds.ToList(), orGroups.ToList(), true);
-        }
-
-        var ancestorIds = CollectAncestors(requiredIds.Concat(orGroups.SelectMany(group => group)).ToHashSet(), expansion);
-        if (ancestorIds.Count == 0)
-        {
-            return new AncestorFilterResult(requiredIds.ToList(), orGroups.ToList(), false);
-        }
-
-        var assignments = await _propertySchemaService
-            .GetResourceTypeAssignmentsAsync(ancestorIds.ToList(), ct)
-            .ConfigureAwait(false);
-        var typeByResourceId = assignments
-            .GroupBy(item => item.ResourceId)
-            .ToDictionary(group => group.Key, group => group.First().ResourceTypeId);
-
-        var filterMatches = new List<AncestorFilterMatch>();
-        for (var i = 0; i < normalizedFilters.Count; i++)
-        {
-            var filter = normalizedFilters[i];
-            var candidates = ancestorIds
-                .Where(id => typeByResourceId.TryGetValue(id, out var typeId) && typeId == filter.ResourceTypeId)
-                .ToHashSet();
-
-            if (candidates.Count == 0)
-            {
-                filterMatches.Add(new AncestorFilterMatch(filter, new HashSet<int>()));
-                continue;
-            }
-
-            var matches = await ResolveMatchingAncestorsAsync(filter, candidates, context, ct).ConfigureAwait(false);
-            filterMatches.Add(new AncestorFilterMatch(filter, matches));
-        }
-
-        var filteredRequired = new List<int>();
-        for (var i = 0; i < requiredIds.Count; i++)
-        {
-            var resourceId = requiredIds[i];
-            if (ResourcePassesFilters(resourceId, filterMatches, expansion, typeByResourceId))
-            {
-                filteredRequired.Add(resourceId);
-            }
-            else
-            {
-                return new AncestorFilterResult(new List<int>(), new List<List<int>>(), false);
-            }
-        }
-
-        var filteredGroups = new List<List<int>>();
-        for (var groupIndex = 0; groupIndex < orGroups.Count; groupIndex++)
-        {
-            var group = orGroups[groupIndex];
-            var filteredGroup = new List<int>();
-            for (var i = 0; i < group.Count; i++)
-            {
-                var resourceId = group[i];
-                if (ResourcePassesFilters(resourceId, filterMatches, expansion, typeByResourceId))
-                {
-                    filteredGroup.Add(resourceId);
-                }
-            }
-
-            if (filteredGroup.Count == 0)
-            {
-                return new AncestorFilterResult(new List<int>(), new List<List<int>>(), false);
-            }
-
-            filteredGroup.Sort();
-            filteredGroups.Add(filteredGroup);
-        }
-
-        return new AncestorFilterResult(filteredRequired, filteredGroups, true);
-    }
-
-    private async Task<HashSet<int>> ResolveMatchingAncestorsAsync(
-        AncestorPropertyFilter filter,
-        HashSet<int> candidates,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        var propertyGroups = await ExpandAncestorPropertyGroupsAsync(filter, context, ct).ConfigureAwait(false);
-        if (propertyGroups.Count == 0)
-        {
-            return new HashSet<int>();
-        }
-
-        HashSet<int>? intersection = null;
-        var union = new HashSet<int>();
-        var isAnd = NormalizeMatchMode(filter.MatchMode) == "and";
-
-        var matchSets = await GetPropertyMatchSetsAsync(propertyGroups, context, ct).ConfigureAwait(false);
-        for (var i = 0; i < matchSets.Count; i++)
-        {
-            var matchSet = matchSets[i];
-
-            if (isAnd)
-            {
-                intersection ??= new HashSet<int>(matchSet);
-                intersection.IntersectWith(matchSet);
-            }
-            else
-            {
-                union.UnionWith(matchSet);
-            }
-        }
-
-        var matches = isAnd ? intersection ?? new HashSet<int>() : union;
-        matches.IntersectWith(candidates);
-        return matches;
-    }
-
-    private async Task<List<List<int>>> ExpandAncestorPropertyGroupsAsync(
-        AncestorPropertyFilter filter,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        var groups = new List<List<int>>();
-        if (filter.PropertyIds == null || filter.PropertyIds.Count == 0)
-        {
-            return groups;
-        }
-
-        for (var i = 0; i < filter.PropertyIds.Count; i++)
-        {
-            var propertyId = filter.PropertyIds[i];
-            var expanded = filter.IncludePropertyDescendants
-                ? await ExpandPropertyIdsCachedAsync(propertyId, context, ct).ConfigureAwait(false)
-                : new List<int> { propertyId };
-            if (expanded.Count > 0)
-            {
-                groups.Add(expanded.Distinct().ToList());
-            }
-        }
-
-        return groups;
-    }
-
-    private async Task<List<HashSet<int>>> GetPropertyMatchSetsAsync(
-        IReadOnlyList<IReadOnlyList<int>> propertySets,
-        PropertyFilterExecutionContext context,
-        CancellationToken ct)
-    {
-        var result = new List<HashSet<int>>(propertySets.Count);
-        var pendingSets = new List<IReadOnlyList<int>>();
-        var pendingIndexes = new List<int>();
-
-        for (var i = 0; i < propertySets.Count; i++)
-        {
-            var normalized = DistinctPropertyIds(propertySets[i]);
-            var cacheKey = BuildPropertySetCacheKey(normalized);
-            if (context.PropertySetMatches.TryGetValue(cacheKey, out var cached))
-            {
-                result.Add(new HashSet<int>(cached));
-                continue;
-            }
-
-            result.Add(new HashSet<int>());
-            pendingSets.Add(normalized);
-            pendingIndexes.Add(i);
-        }
-
-        if (pendingSets.Count == 0)
-        {
-            return result;
-        }
-
-        var loadedMatches = await _filterQueryService
-            .GetResourceIdsByPropertySetsAsync(pendingSets, ct)
-            .ConfigureAwait(false);
-
-        for (var i = 0; i < pendingSets.Count; i++)
-        {
-            var normalized = DistinctPropertyIds(pendingSets[i]);
-            var cacheKey = BuildPropertySetCacheKey(normalized);
-            var matchSet = new HashSet<int>(loadedMatches[i]);
-            context.PropertySetMatches[cacheKey] = matchSet;
-            result[pendingIndexes[i]] = new HashSet<int>(matchSet);
-        }
-
-        return result;
-    }
-
-    private static string BuildPropertySetCacheKey(IReadOnlyList<int> propertyIds)
-    {
-        return propertyIds.Count == 0 ? string.Empty : string.Join(',', propertyIds);
-    }
-
-    private static bool ResourcePassesFilters(
-        int resourceId,
-        IReadOnlyList<AncestorFilterMatch> filters,
-        AncestorExpansion expansion,
-        IReadOnlyDictionary<int, int> typeByResourceId)
-    {
-        for (var i = 0; i < filters.Count; i++)
-        {
-            var filterMatch = filters[i];
-            var eligibleAncestors = GetEligibleAncestors(
-                resourceId,
-                filterMatch.Filter,
-                expansion,
-                typeByResourceId);
-
-            if (eligibleAncestors.Count == 0)
-            {
-                return false;
-            }
-
-            if (filterMatch.Filter.MatchAllAncestors)
-            {
-                foreach (var ancestorId in eligibleAncestors)
-                {
-                    if (!filterMatch.MatchingAncestors.Contains(ancestorId))
-                    {
-                        return false;
-                    }
-                }
-            }
-            else
-            {
-                var hasMatch = false;
-                foreach (var ancestorId in eligibleAncestors)
-                {
-                    if (filterMatch.MatchingAncestors.Contains(ancestorId))
-                    {
-                        hasMatch = true;
-                        break;
-                    }
-                }
-
-                if (!hasMatch)
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private static HashSet<int> GetEligibleAncestors(
-        int resourceId,
-        AncestorPropertyFilter filter,
-        AncestorExpansion expansion,
-        IReadOnlyDictionary<int, int> typeByResourceId)
-    {
-        var scope = NormalizeAncestorScope(filter.Scope) ?? "anyAncestor";
-        var result = new HashSet<int>();
-
-        switch (scope)
-        {
-            case "directParent":
-                if (expansion.ParentsByChild.TryGetValue(resourceId, out var parents))
-                {
-                    foreach (var parent in parents)
-                    {
-                        if (typeByResourceId.TryGetValue(parent, out var typeId)
-                            && typeId == filter.ResourceTypeId)
-                        {
-                            result.Add(parent);
-                        }
-                    }
-                }
-                return result;
-            case "nearestOfType":
-                return FindNearestAncestorsOfType(resourceId, filter.ResourceTypeId, expansion.ParentsByChild, typeByResourceId);
-        }
-
-        if (expansion.AncestorMap.TryGetValue(resourceId, out var ancestors))
-        {
-            foreach (var ancestor in ancestors)
-            {
-                if (typeByResourceId.TryGetValue(ancestor, out var typeId)
-                    && typeId == filter.ResourceTypeId)
-                {
-                    result.Add(ancestor);
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private static HashSet<int> FindNearestAncestorsOfType(
-        int resourceId,
-        int resourceTypeId,
-        IReadOnlyDictionary<int, HashSet<int>> parentsByChild,
-        IReadOnlyDictionary<int, int> typeByResourceId)
-    {
-        if (!parentsByChild.TryGetValue(resourceId, out var parents))
-        {
-            return new HashSet<int>();
-        }
-
-        var visited = new HashSet<int>();
-        var queue = new Queue<(int ResourceId, int Depth)>();
-        foreach (var parent in parents)
-        {
-            queue.Enqueue((parent, 1));
-        }
-
-        var result = new HashSet<int>();
-        int? matchDepth = null;
-
-        while (queue.Count > 0)
-        {
-            var (current, depth) = queue.Dequeue();
-            if (matchDepth.HasValue && depth > matchDepth.Value)
-            {
-                break;
-            }
-
-            if (!visited.Add(current))
-            {
-                continue;
-            }
-
-            if (typeByResourceId.TryGetValue(current, out var typeId) && typeId == resourceTypeId)
-            {
-                result.Add(current);
-                matchDepth ??= depth;
-                continue;
-            }
-
-            if (matchDepth.HasValue)
-            {
-                continue;
-            }
-
-            if (parentsByChild.TryGetValue(current, out var nextParents))
-            {
-                foreach (var parent in nextParents)
-                {
-                    queue.Enqueue((parent, depth + 1));
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private static List<AncestorPropertyFilter> NormalizeAncestorFilters(
-        IReadOnlyList<AncestorPropertyFilter> filters)
-    {
-        var result = new List<AncestorPropertyFilter>();
-        for (var i = 0; i < filters.Count; i++)
-        {
-            var filter = filters[i];
-            var propertyIds = filter.PropertyIds?.Distinct().ToList() ?? new List<int>();
-            result.Add(filter with
-            {
-                PropertyIds = propertyIds,
-                MatchMode = NormalizeMatchMode(filter.MatchMode) ?? "or",
-                Scope = NormalizeAncestorScope(filter.Scope) ?? "anyAncestor"
-            });
-        }
-
-        return result;
-    }
-
-    private static List<int> ExpandRequiredAncestors(
-        IReadOnlyList<int> requiredIds,
-        AncestorExpansion expansion)
-    {
-        if (requiredIds.Count == 0 || expansion.AncestorMap.Count == 0)
-        {
-            return requiredIds.ToList();
-        }
-
-        var result = new HashSet<int>(requiredIds);
-        for (var i = 0; i < requiredIds.Count; i++)
-        {
-            if (expansion.AncestorMap.TryGetValue(requiredIds[i], out var ancestors))
-            {
-                result.UnionWith(ancestors);
-            }
-        }
-
-        var list = result.ToList();
-        list.Sort();
-        return list;
     }
 
     private AvailabilityResult ComputePerGroupAvailability(
@@ -1244,495 +398,6 @@ public sealed class AvailabilityService : IAvailabilityService
         }
 
         return SlotComposition.Normalize(slots, mergeByResources: false);
-    }
-
-    private async Task<AncestorExpansion> BuildAncestorExpansionAsync(
-        IReadOnlyCollection<int> resourceIds,
-        IReadOnlyList<string>? relationTypes,
-        CancellationToken ct)
-    {
-        if (resourceIds.Count == 0)
-        {
-            return AncestorExpansion.Empty;
-        }
-
-        var normalizedTypes = NormalizeRelationTypes(relationTypes);
-        var relations = await _ancestorQueryService
-            .GetResourceRelationsByTypesAsync(normalizedTypes, ct)
-            .ConfigureAwait(false);
-
-        var reachable = BuildReachableAncestorParents(resourceIds, relations);
-        if (reachable.Count == 0)
-        {
-            return AncestorExpansion.Empty;
-        }
-
-        var ancestorMap = new Dictionary<int, HashSet<int>>();
-        var allAncestors = new HashSet<int>();
-        foreach (var resourceId in resourceIds)
-        {
-            var ancestors = ResolveAncestors(resourceId, reachable, ancestorMap);
-            if (ancestors.Count > 0)
-            {
-                allAncestors.UnionWith(ancestors);
-            }
-        }
-
-        return new AncestorExpansion(ancestorMap, allAncestors, reachable);
-    }
-
-    private static Dictionary<int, HashSet<int>> BuildReachableAncestorParents(
-        IReadOnlyCollection<int> resourceIds,
-        IReadOnlyList<ResourceRelationLink> relations)
-    {
-        var fullParentsByChild = new Dictionary<int, List<int>>();
-        for (var i = 0; i < relations.Count; i++)
-        {
-            var relation = relations[i];
-            if (!fullParentsByChild.TryGetValue(relation.ChildResourceId, out var parents))
-            {
-                parents = new List<int>();
-                fullParentsByChild[relation.ChildResourceId] = parents;
-            }
-
-            if (!parents.Contains(relation.ParentResourceId))
-            {
-                parents.Add(relation.ParentResourceId);
-            }
-        }
-
-        var reachable = new Dictionary<int, HashSet<int>>();
-        var pending = new Queue<int>();
-        var visited = new HashSet<int>();
-
-        foreach (var resourceId in resourceIds)
-        {
-            if (visited.Add(resourceId))
-            {
-                pending.Enqueue(resourceId);
-            }
-        }
-
-        while (pending.Count > 0)
-        {
-            var childId = pending.Dequeue();
-            if (!fullParentsByChild.TryGetValue(childId, out var parents))
-            {
-                continue;
-            }
-
-            if (!reachable.TryGetValue(childId, out var reachableParents))
-            {
-                reachableParents = new HashSet<int>();
-                reachable[childId] = reachableParents;
-            }
-
-            for (var i = 0; i < parents.Count; i++)
-            {
-                var parentId = parents[i];
-                reachableParents.Add(parentId);
-                if (visited.Add(parentId))
-                {
-                    pending.Enqueue(parentId);
-                }
-            }
-        }
-
-        return reachable;
-    }
-
-    private static HashSet<int> ResolveAncestors(
-        int resourceId,
-        IReadOnlyDictionary<int, HashSet<int>> parentsByChild,
-        IDictionary<int, HashSet<int>> cache)
-    {
-        if (cache.TryGetValue(resourceId, out var cached))
-        {
-            return cached;
-        }
-
-        var result = new HashSet<int>();
-        if (parentsByChild.TryGetValue(resourceId, out var parents))
-        {
-            foreach (var parent in parents)
-            {
-                result.Add(parent);
-                result.UnionWith(ResolveAncestors(parent, parentsByChild, cache));
-            }
-        }
-
-        cache[resourceId] = result;
-        return result;
-    }
-
-    private static IReadOnlyList<string>? NormalizeRelationTypes(IReadOnlyList<string>? relationTypes)
-    {
-        if (relationTypes == null || relationTypes.Count == 0)
-        {
-            return null;
-        }
-
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < relationTypes.Count; i++)
-        {
-            var value = relationTypes[i]?.Trim();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                continue;
-            }
-
-            set.Add(value);
-        }
-
-        return set.Count == 0 ? null : set.ToList();
-    }
-
-    private static IReadOnlyList<UtcSlot> ApplySlotDuration(
-        IReadOnlyList<UtcSlot> slots,
-        AvailabilityComputeRequest request)
-    {
-        if (slots.Count == 0 || !request.SlotDurationMinutes.HasValue)
-        {
-            return slots;
-        }
-
-        var duration = TimeSpan.FromMinutes(request.SlotDurationMinutes.Value);
-        var includeRemainder = request.IncludeRemainderSlot;
-        if (duration <= TimeSpan.Zero)
-        {
-            return slots;
-        }
-
-        var result = new List<UtcSlot>();
-        for (var i = 0; i < slots.Count; i++)
-        {
-            var slot = slots[i];
-            var length = slot.EndUtc - slot.StartUtc;
-            if (length <= TimeSpan.Zero)
-            {
-                continue;
-            }
-
-            var fullCount = (int)(length.Ticks / duration.Ticks);
-            for (var index = 0; index < fullCount; index++)
-            {
-                var start = slot.StartUtc.AddTicks(duration.Ticks * index);
-                var end = start.Add(duration);
-                result.Add(new UtcSlot(start, end, slot.ResourceIds));
-            }
-
-            var remainderTicks = length.Ticks - (duration.Ticks * fullCount);
-            if (includeRemainder && remainderTicks > 0)
-            {
-                var remainderStart = slot.StartUtc.AddTicks(duration.Ticks * fullCount);
-                var remainderEnd = slot.EndUtc;
-                if (remainderEnd > remainderStart)
-                {
-                    result.Add(new UtcSlot(remainderStart, remainderEnd, slot.ResourceIds));
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private static string? NormalizeAncestorMode(string? mode)
-    {
-        if (string.IsNullOrWhiteSpace(mode))
-        {
-            return "perGroup";
-        }
-
-        mode = mode.Trim();
-
-        if (mode.Equals("perGroup", StringComparison.OrdinalIgnoreCase))
-        {
-            return "perGroup";
-        }
-
-        return mode.Equals("global", StringComparison.OrdinalIgnoreCase)
-            ? "global"
-            : null;
-    }
-
-    private static string? NormalizeMatchMode(string? mode)
-    {
-        if (string.IsNullOrWhiteSpace(mode))
-        {
-            return "or";
-        }
-
-        return mode.Equals("or", StringComparison.OrdinalIgnoreCase)
-            ? "or"
-            : mode.Equals("and", StringComparison.OrdinalIgnoreCase)
-                ? "and"
-                : null;
-    }
-
-    private static string? NormalizePropertyMatchMode(string? mode)
-    {
-        if (string.IsNullOrWhiteSpace(mode))
-        {
-            return "and";
-        }
-
-        return mode.Equals("or", StringComparison.OrdinalIgnoreCase)
-            ? "or"
-            : mode.Equals("and", StringComparison.OrdinalIgnoreCase)
-                ? "and"
-                : null;
-    }
-
-    private static string? NormalizeAncestorScope(string? scope)
-    {
-        if (string.IsNullOrWhiteSpace(scope))
-        {
-            return "anyAncestor";
-        }
-
-        return scope.Equals("anyAncestor", StringComparison.OrdinalIgnoreCase)
-            ? "anyAncestor"
-            : scope.Equals("directParent", StringComparison.OrdinalIgnoreCase)
-                ? "directParent"
-                : scope.Equals("nearestOfType", StringComparison.OrdinalIgnoreCase)
-                    ? "nearestOfType"
-                    : null;
-    }
-
-    private sealed record AncestorFilterResult(
-        List<int> RequiredIds,
-        List<List<int>> OrGroups,
-        bool IsSatisfied);
-
-    private sealed record AncestorFilterMatch(
-        AncestorPropertyFilter Filter,
-        HashSet<int> MatchingAncestors);
-
-    private sealed record AncestorExpansion(
-        Dictionary<int, HashSet<int>> AncestorMap,
-        HashSet<int> AllAncestors,
-        Dictionary<int, HashSet<int>> ParentsByChild)
-    {
-        public static readonly AncestorExpansion Empty = new(
-            new Dictionary<int, HashSet<int>>(),
-            new HashSet<int>(),
-            new Dictionary<int, HashSet<int>>());
-    }
-
-    private sealed class PropertyFilterExecutionContext
-    {
-        public Dictionary<int, IReadOnlyList<int>> ExpandedPropertyIds { get; } = new();
-        public Dictionary<string, HashSet<int>> PropertySetMatches { get; } = new(StringComparer.Ordinal);
-    }
-
-    private async Task<List<int>> ExpandPropertyIdsAsync(int propertyId, CancellationToken ct)
-    {
-        var subtree = await _filterQueryService.ExpandPropertySubtreeAsync(propertyId, ct).ConfigureAwait(false);
-        var ids = new List<int>(subtree.Count);
-        for (var i = 0; i < subtree.Count; i++)
-        {
-            ids.Add(subtree[i].Id);
-        }
-
-        return ids;
-    }
-
-    private static AvailabilityExplanation BuildEmptyExplanation(
-        AvailabilityComputation computation,
-        DateOnly fromDate,
-        DateOnly toDate)
-    {
-        var fromUtc = DateTime.SpecifyKind(fromDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var toUtcExclusive = DateTime.SpecifyKind(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-
-        if (!computation.HasPositiveRules)
-        {
-            return new AvailabilityExplanation(
-                "NoPositiveRule",
-                ResourceId: null,
-                FromUtc: fromUtc,
-                ToUtc: toUtcExclusive,
-                RuleId: null,
-                BusyEventId: null,
-                "No positive rules apply to the requested range.");
-        }
-
-        if (computation.HasBusySlots)
-        {
-            return new AvailabilityExplanation(
-                "FullyBlockedByBusy",
-                ResourceId: null,
-                FromUtc: fromUtc,
-                ToUtc: toUtcExclusive,
-                RuleId: null,
-                BusyEventId: null,
-                "Busy events block availability in the requested range.");
-        }
-
-        if (computation.HasNegativeRules)
-        {
-            return new AvailabilityExplanation(
-                "FullyBlockedByNegativeRule",
-                ResourceId: null,
-                FromUtc: fromUtc,
-                ToUtc: toUtcExclusive,
-                RuleId: null,
-                BusyEventId: null,
-                "Negative rules block availability in the requested range.");
-        }
-
-        return new AvailabilityExplanation(
-            "PartiallyBlocked",
-            ResourceId: null,
-            FromUtc: fromUtc,
-            ToUtc: toUtcExclusive,
-            RuleId: null,
-            BusyEventId: null,
-            "Availability is blocked by rules or busy events.");
-    }
-
-    private static bool RuleAppliesToPeriod(AvailabilityRule rule, DatePeriod period)
-    {
-        return rule.Kind switch
-        {
-            RuleKind.RecurringWeekly => WeeklyRuleApplies(rule, period),
-            RuleKind.SingleDate => SingleDateRuleApplies(rule, period),
-            RuleKind.Range => RangeRuleApplies(rule, period),
-            RuleKind.Monthly => MonthlyRuleApplies(rule, period),
-            RuleKind.Repeating => RepeatingRuleApplies(rule, period),
-            _ => false
-        };
-    }
-
-    private static bool WeeklyRuleApplies(AvailabilityRule rule, DatePeriod period)
-    {
-        if (rule.DaysOfWeekMask == null)
-        {
-            return false;
-        }
-
-        var start = rule.FromDate ?? period.From;
-        var end = rule.ToDate ?? period.To;
-        if (end < period.From || start > period.To)
-        {
-            return false;
-        }
-
-        var from = start < period.From ? period.From : start;
-        var to = end > period.To ? period.To : end;
-
-        foreach (var day in EnumerateDays(from, to))
-        {
-            if (MatchesDayOfWeek(day.DayOfWeek, rule.DaysOfWeekMask.Value))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool SingleDateRuleApplies(AvailabilityRule rule, DatePeriod period)
-    {
-        if (rule.SingleDate == null)
-        {
-            return false;
-        }
-
-        var date = rule.SingleDate.Value;
-        return date >= period.From && date <= period.To;
-    }
-
-    private static bool RangeRuleApplies(AvailabilityRule rule, DatePeriod period)
-    {
-        var start = rule.FromDate ?? period.From;
-        var end = rule.ToDate ?? period.To;
-        return !(end < period.From || start > period.To);
-    }
-
-    private static bool MonthlyRuleApplies(AvailabilityRule rule, DatePeriod period)
-    {
-        if (rule.DayOfMonth == null || rule.DayOfMonth <= 0 || rule.DayOfMonth > 31)
-        {
-            return false;
-        }
-
-        foreach (var day in EnumerateDays(period.From, period.To))
-        {
-            if (day.Day == rule.DayOfMonth.Value)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool RepeatingRuleApplies(AvailabilityRule rule, DatePeriod period)
-    {
-        if (rule.IntervalDays == null || rule.IntervalDays <= 0)
-        {
-            return false;
-        }
-
-        var start = rule.FromDate ?? period.From;
-        var end = rule.ToDate ?? period.To;
-        if (end < period.From || start > period.To)
-        {
-            return false;
-        }
-
-        if (start < period.From)
-        {
-            var delta = period.From.DayNumber - start.DayNumber;
-            var skip = delta / rule.IntervalDays.Value;
-            start = start.AddDays(skip * rule.IntervalDays.Value);
-        }
-
-        return start <= end && start <= period.To;
-    }
-
-    private static IEnumerable<DateOnly> EnumerateDays(DateOnly from, DateOnly to)
-    {
-        for (var day = from; day <= to; day = day.AddDays(1))
-        {
-            yield return day;
-        }
-    }
-
-    private static bool MatchesDayOfWeek(DayOfWeek dayOfWeek, int mask)
-    {
-        var bit = 1 << (int)dayOfWeek;
-        return (mask & bit) == bit;
-    }
-
-    private static List<List<int>> NormalizeOrGroups(IReadOnlyList<IReadOnlyList<int>>? resourceOrGroups)
-    {
-        if (resourceOrGroups == null || resourceOrGroups.Count == 0)
-        {
-            return new List<List<int>>();
-        }
-
-        var result = new List<List<int>>();
-        for (var i = 0; i < resourceOrGroups.Count; i++)
-        {
-            result.Add(resourceOrGroups[i].Distinct().ToList());
-        }
-
-        return result;
-    }
-
-    private static bool HasNonPositive(IReadOnlyList<int> values)
-    {
-        for (var i = 0; i < values.Count; i++)
-        {
-            if (values[i] <= 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private AvailabilityResult ComputeOrOnlyAvailability(
@@ -1827,5 +492,3 @@ public sealed class AvailabilityService : IAvailabilityService
         }
     }
 }
-
-
