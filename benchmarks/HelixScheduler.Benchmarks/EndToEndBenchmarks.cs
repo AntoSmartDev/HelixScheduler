@@ -40,7 +40,8 @@ public class EndToEndBenchmarks
         var schemaSource = new PropertySchemaQueryService(_dbContext);
         var schemaService = new PropertySchemaService(schemaSource);
         var computeQueryService = new AvailabilityComputeQueryService(_dbContext);
-        var filterQueryService = new AvailabilityFilterQueryService(_dbContext);
+        var propertyHierarchyQueryService = new PropertyHierarchyQueryService(_dbContext);
+        var filterQueryService = new AvailabilityFilterQueryService(_dbContext, propertyHierarchyQueryService);
         var ancestorQueryService = new AvailabilityAncestorQueryService(_dbContext);
         _service = new AvailabilityService(
             computeQueryService,

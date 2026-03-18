@@ -24,28 +24,20 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration cfg)
     {
-        var provider = cfg["HelixScheduler:DatabaseProvider"] ?? "Sqlite";
+        var connectionString = cfg.GetConnectionString("SchedulerDb");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("ConnectionStrings:SchedulerDb is required.");
+        }
+
         services.AddDbContext<SchedulerDbContext>(options =>
         {
-            if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
-            {
-                var connectionString = cfg.GetConnectionString("SchedulerDb");
-                if (string.IsNullOrWhiteSpace(connectionString))
-                {
-                    throw new InvalidOperationException("ConnectionStrings:SchedulerDb is required for SqlServer.");
-                }
-
-                options.UseSqlServer(connectionString);
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    "SQLite support is temporarily disabled. Set HelixScheduler:DatabaseProvider to SqlServer.");
-            }
+            options.UseSqlServer(connectionString);
         });
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantStore, TenantStore>();
+        services.AddScoped<PropertyHierarchyQueryService>();
         services.AddScoped<IAvailabilityComputeQueryService, AvailabilityComputeQueryService>();
         services.AddScoped<IAvailabilityFilterQueryService, AvailabilityFilterQueryService>();
         services.AddScoped<IAvailabilityAncestorQueryService, AvailabilityAncestorQueryService>();

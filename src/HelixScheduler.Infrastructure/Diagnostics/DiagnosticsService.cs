@@ -1,5 +1,6 @@
 using HelixScheduler.Application.Diagnostics;
 using HelixScheduler.Infrastructure.Persistence;
+using HelixScheduler.Infrastructure.Persistence.QueryServices;
 using Microsoft.EntityFrameworkCore;
 
 namespace HelixScheduler.Infrastructure.Diagnostics;
@@ -7,10 +8,14 @@ namespace HelixScheduler.Infrastructure.Diagnostics;
 public sealed class DiagnosticsService : IDiagnosticsService
 {
     private readonly SchedulerDbContext _dbContext;
+    private readonly PropertyHierarchyQueryService _propertyHierarchyQueryService;
 
-    public DiagnosticsService(SchedulerDbContext dbContext)
+    public DiagnosticsService(
+        SchedulerDbContext dbContext,
+        PropertyHierarchyQueryService propertyHierarchyQueryService)
     {
         _dbContext = dbContext;
+        _propertyHierarchyQueryService = propertyHierarchyQueryService;
     }
 
     public async Task<DbCounts> GetDbCountsAsync(CancellationToken ct)
@@ -37,43 +42,9 @@ public sealed class DiagnosticsService : IDiagnosticsService
 
     public async Task<IReadOnlyList<int>> GetPropertySubtreeAsync(int propertyId, CancellationToken ct)
     {
-        var result = new List<int>();
-        var seenIds = new HashSet<int>();
-        var frontier = new List<int> { propertyId };
-        var visited = new HashSet<int>();
-
-        while (frontier.Count > 0)
-        {
-            var batch = frontier.Where(visited.Add).ToList();
-            frontier.Clear();
-            if (batch.Count == 0)
-            {
-                continue;
-            }
-
-            var nodes = await _dbContext.ResourceProperties
-                .AsNoTracking()
-                .Where(property => batch.Contains(property.Id) || (property.ParentId != null && batch.Contains(property.ParentId.Value)))
-                .Select(property => new { property.Id, property.ParentId })
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            for (var i = 0; i < nodes.Count; i++)
-            {
-                var node = nodes[i];
-                if (seenIds.Add(node.Id))
-                {
-                    result.Add(node.Id);
-                }
-
-                if (node.ParentId.HasValue && batch.Contains(node.ParentId.Value))
-                {
-                    frontier.Add(node.Id);
-                }
-            }
-        }
-
-        result.Sort();
-        return result;
+        var subtree = await _propertyHierarchyQueryService
+            .ExpandPropertySubtreeAsync(propertyId, ct)
+            .ConfigureAwait(false);
+        return subtree.Select(node => node.Id).ToList();
     }
 }
