@@ -53,7 +53,7 @@ public sealed class AvailabilityEngine
                 .Select(slot => new UtcSlot(slot.StartUtc, slot.EndUtc, new[] { resourceId })));
 
             availability = SubtractSlots(availability, blocks);
-            availability = NormalizeSlots(availability);
+            availability = SlotComposition.Normalize(availability, mergeByResources: true);
 
             perResourceAvailability[resourceId] = availability;
         }
@@ -62,7 +62,7 @@ public sealed class AvailabilityEngine
         var intersection = perResourceAvailability[requiredIds[0]];
         for (var index = 1; index < requiredIds.Length; index++)
         {
-            intersection = IntersectSlots(intersection, perResourceAvailability[requiredIds[index]]);
+            intersection = SlotComposition.IntersectByTime(intersection, perResourceAvailability[requiredIds[index]]);
             if (intersection.Count == 0)
             {
                 break;
@@ -78,14 +78,14 @@ public sealed class AvailabilityEngine
                 break;
             }
 
-            var union = UnionSlots(group, perResourceAvailability);
+            var union = SlotComposition.UnionByTime(group, perResourceAvailability);
             if (union.Count == 0)
             {
                 intersection = new List<UtcSlot>();
                 break;
             }
 
-            intersection = IntersectSlots(intersection, union);
+            intersection = SlotComposition.IntersectByTime(intersection, union);
             if (intersection.Count == 0)
             {
                 break;
@@ -97,7 +97,7 @@ public sealed class AvailabilityEngine
             .Select(slot => new UtcSlot(slot.StartUtc, slot.EndUtc, resultResourceIds))
             .ToList();
 
-        resultSlots = NormalizeSlots(resultSlots);
+        resultSlots = SlotComposition.Normalize(resultSlots, mergeByResources: true);
 
         return new AvailabilityResult(resultSlots);
     }
@@ -291,7 +291,7 @@ public sealed class AvailabilityEngine
             .ThenBy(slot => slot.EndUtc)
             .ToList();
 
-        foreach (var slot in NormalizeSlots(available))
+        foreach (var slot in SlotComposition.Normalize(available, mergeByResources: true))
         {
             var segments = new List<UtcSlot> { slot };
             foreach (var block in orderedBlocks)
@@ -308,7 +308,7 @@ public sealed class AvailabilityEngine
             result.AddRange(segments);
         }
 
-        return NormalizeSlots(result);
+        return SlotComposition.Normalize(result, mergeByResources: true);
     }
 
     private static IEnumerable<UtcSlot> SubtractSegment(UtcSlot segment, UtcSlot block)
@@ -335,82 +335,4 @@ public sealed class AvailabilityEngine
         }
     }
 
-    private static List<UtcSlot> IntersectSlots(IReadOnlyList<UtcSlot> first, IReadOnlyList<UtcSlot> second)
-    {
-        var result = new List<UtcSlot>();
-        var a = first.OrderBy(slot => slot.StartUtc).ToList();
-        var b = second.OrderBy(slot => slot.StartUtc).ToList();
-
-        var i = 0;
-        var j = 0;
-        while (i < a.Count && j < b.Count)
-        {
-            var start = a[i].StartUtc > b[j].StartUtc ? a[i].StartUtc : b[j].StartUtc;
-            var end = a[i].EndUtc < b[j].EndUtc ? a[i].EndUtc : b[j].EndUtc;
-
-            if (end > start)
-            {
-                result.Add(new UtcSlot(start, end, Array.Empty<int>()));
-            }
-
-            if (a[i].EndUtc <= b[j].EndUtc)
-            {
-                i++;
-            }
-            else
-            {
-                j++;
-            }
-        }
-
-        return result;
-    }
-
-    private static List<UtcSlot> NormalizeSlots(IReadOnlyList<UtcSlot> slots)
-    {
-        if (slots.Count == 0)
-        {
-            return new List<UtcSlot>();
-        }
-
-        var ordered = slots
-            .OrderBy(slot => slot.StartUtc)
-            .ThenBy(slot => slot.EndUtc)
-            .ToList();
-
-        var normalized = new List<UtcSlot> { ordered[0] };
-        for (var index = 1; index < ordered.Count; index++)
-        {
-            var last = normalized[^1];
-            var current = ordered[index];
-
-            if (current.StartUtc <= last.EndUtc)
-            {
-                var end = current.EndUtc > last.EndUtc ? current.EndUtc : last.EndUtc;
-                normalized[^1] = new UtcSlot(last.StartUtc, end, last.ResourceIds);
-            }
-            else
-            {
-                normalized.Add(current);
-            }
-        }
-
-        return normalized;
-    }
-
-    private static List<UtcSlot> UnionSlots(
-        IReadOnlyList<int> resourceIds,
-        IReadOnlyDictionary<int, List<UtcSlot>> perResource)
-    {
-        var slots = new List<UtcSlot>();
-        for (var i = 0; i < resourceIds.Count; i++)
-        {
-            if (perResource.TryGetValue(resourceIds[i], out var resourceSlots))
-            {
-                slots.AddRange(resourceSlots);
-            }
-        }
-
-        return NormalizeSlots(slots);
-    }
 }

@@ -1227,7 +1227,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
             intersection = intersection == null
                 ? union
-                : IntersectSlots(intersection, union);
+                : SlotComposition.IntersectByTime(intersection, union, allResourceIds);
 
             if (intersection.Count == 0)
             {
@@ -1240,7 +1240,7 @@ public sealed class AvailabilityService : IAvailabilityService
             return new AvailabilityResult(Array.Empty<UtcSlot>());
         }
 
-        var normalized = NormalizeSlots(intersection);
+        var normalized = SlotComposition.Normalize(intersection, mergeByResources: false);
         return new AvailabilityResult(normalized);
     }
 
@@ -1266,14 +1266,10 @@ public sealed class AvailabilityService : IAvailabilityService
             requiredList.Sort();
             var query = new AvailabilityQuery(period, requiredList);
             var result = _engine.ComposeAvailability(query, perResourceAvailability);
-            for (var s = 0; s < result.Slots.Count; s++)
-            {
-                var slot = result.Slots[s];
-                slots.Add(new UtcSlot(slot.StartUtc, slot.EndUtc, allResourceIds));
-            }
+            slots.AddRange(SlotComposition.Project(result.Slots, allResourceIds));
         }
 
-        return NormalizeSlots(slots);
+        return SlotComposition.Normalize(slots, mergeByResources: false);
     }
 
     private async Task<AncestorExpansion> BuildAncestorExpansionAsync(
@@ -1745,7 +1741,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
             intersection = intersection == null
                 ? union
-                : IntersectSlots(intersection, union);
+                : SlotComposition.IntersectByTime(intersection, union, allResourceIds);
 
             if (intersection.Count == 0)
             {
@@ -1758,7 +1754,7 @@ public sealed class AvailabilityService : IAvailabilityService
             return new AvailabilityResult(Array.Empty<UtcSlot>());
         }
 
-        var normalized = NormalizeSlots(intersection);
+        var normalized = SlotComposition.Normalize(intersection, mergeByResources: false);
         return new AvailabilityResult(normalized);
     }
 
@@ -1767,22 +1763,7 @@ public sealed class AvailabilityService : IAvailabilityService
         IReadOnlyList<int> allResourceIds,
         IReadOnlyDictionary<int, List<UtcSlot>> perResourceAvailability)
     {
-        var slots = new List<UtcSlot>();
-        for (var i = 0; i < groupResourceIds.Count; i++)
-        {
-            if (!perResourceAvailability.TryGetValue(groupResourceIds[i], out var resourceSlots))
-            {
-                continue;
-            }
-
-            for (var s = 0; s < resourceSlots.Count; s++)
-            {
-                var slot = resourceSlots[s];
-                slots.Add(new UtcSlot(slot.StartUtc, slot.EndUtc, allResourceIds));
-            }
-        }
-
-        return NormalizeSlots(slots);
+        return SlotComposition.UnionByTime(groupResourceIds, perResourceAvailability, allResourceIds);
     }
 
     private IReadOnlyDictionary<int, List<UtcSlot>> BuildPerResourceAvailability(
@@ -1797,90 +1778,6 @@ public sealed class AvailabilityService : IAvailabilityService
 
         var query = new AvailabilityQuery(period, allResourceIds);
         return _engine.ComputePerResourceAvailability(query, inputs);
-    }
-
-    private static List<UtcSlot> IntersectSlots(IReadOnlyList<UtcSlot> first, IReadOnlyList<UtcSlot> second)
-    {
-        var result = new List<UtcSlot>();
-        var i = 0;
-        var j = 0;
-        while (i < first.Count && j < second.Count)
-        {
-            var start = first[i].StartUtc > second[j].StartUtc ? first[i].StartUtc : second[j].StartUtc;
-            var end = first[i].EndUtc < second[j].EndUtc ? first[i].EndUtc : second[j].EndUtc;
-
-            if (end > start)
-            {
-                result.Add(new UtcSlot(start, end, first[i].ResourceIds));
-            }
-
-            if (first[i].EndUtc <= second[j].EndUtc)
-            {
-                i++;
-            }
-            else
-            {
-                j++;
-            }
-        }
-
-        return result;
-    }
-
-    private static List<UtcSlot> NormalizeSlots(IReadOnlyList<UtcSlot> slots)
-    {
-        if (slots.Count == 0)
-        {
-            return new List<UtcSlot>();
-        }
-
-        var ordered = new List<UtcSlot>(slots);
-        ordered.Sort(CompareSlotsByTime);
-
-        var normalized = new List<UtcSlot> { ordered[0] };
-        for (var index = 1; index < ordered.Count; index++)
-        {
-            var last = normalized[^1];
-            var current = ordered[index];
-
-            if (current.StartUtc <= last.EndUtc)
-            {
-                var end = current.EndUtc > last.EndUtc ? current.EndUtc : last.EndUtc;
-                normalized[^1] = new UtcSlot(last.StartUtc, end, last.ResourceIds);
-            }
-            else
-            {
-                normalized.Add(current);
-            }
-        }
-
-        return normalized;
-    }
-
-    private static int CompareSlotsByTime(UtcSlot? x, UtcSlot? y)
-    {
-        if (ReferenceEquals(x, y))
-        {
-            return 0;
-        }
-
-        if (x is null)
-        {
-            return -1;
-        }
-
-        if (y is null)
-        {
-            return 1;
-        }
-
-        var startCompare = x.StartUtc.CompareTo(y.StartUtc);
-        if (startCompare != 0)
-        {
-            return startCompare;
-        }
-
-        return x.EndUtc.CompareTo(y.EndUtc);
     }
 
     private sealed class AvailabilityComputation

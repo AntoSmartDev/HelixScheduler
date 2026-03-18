@@ -350,6 +350,31 @@ public sealed class AvailabilityEngineV1Tests
         }
     }
 
+    [Fact]
+    public void SlotComposition_UnionAndIntersect_ByTime_Preserves_Projected_ResourceIds()
+    {
+        var allResourceIds = new[] { 9, 1, 2 };
+        var perResource = new Dictionary<int, List<UtcSlot>>
+        {
+            [1] = new() { new UtcSlot(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc), new[] { 1 }) },
+            [2] = new() { new UtcSlot(new DateTime(2025, 3, 10, 9, 30, 0, DateTimeKind.Utc), new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc), new[] { 2 }) }
+        };
+
+        var union = SlotComposition.UnionByTime(new[] { 1, 2 }, perResource, allResourceIds);
+        var required = new[]
+        {
+            new UtcSlot(new DateTime(2025, 3, 10, 8, 30, 0, DateTimeKind.Utc), new DateTime(2025, 3, 10, 10, 30, 0, DateTimeKind.Utc), allResourceIds)
+        };
+
+        var intersection = SlotComposition.IntersectByTime(required, union, allResourceIds);
+        var normalized = SlotComposition.Normalize(intersection, mergeByResources: false);
+
+        Assert.Single(normalized);
+        Assert.Equal(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), normalized[0].StartUtc);
+        Assert.Equal(new DateTime(2025, 3, 10, 10, 30, 0, DateTimeKind.Utc), normalized[0].EndUtc);
+        Assert.Equal(allResourceIds, normalized[0].ResourceIds.ToArray());
+    }
+
     private static RuleModel WeeklyRule(long id, int resourceId, params DayOfWeek[] days)
     {
         return new RuleModel(

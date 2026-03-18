@@ -78,8 +78,8 @@ public sealed class AvailabilityEngineV1
                 }
             }
 
-            var normalizedPositive = NormalizeSlots(positive);
-            var normalizedNegative = NormalizeSlots(negative);
+            var normalizedPositive = SlotComposition.Normalize(positive, mergeByResources: true);
+            var normalizedNegative = SlotComposition.Normalize(negative, mergeByResources: true);
             perResource[resourceId] = SubtractSlots(normalizedPositive, normalizedNegative);
         }
 
@@ -116,7 +116,7 @@ public sealed class AvailabilityEngineV1
                 return new AvailabilityResult(Array.Empty<UtcSlot>());
             }
 
-            intersection = IntersectSlots(intersection, resourceSlots);
+            intersection = SlotComposition.IntersectByTime(intersection, resourceSlots);
             if (intersection.Count == 0)
             {
                 break;
@@ -132,14 +132,14 @@ public sealed class AvailabilityEngineV1
                 break;
             }
 
-            var union = UnionSlots(group, perResource);
+            var union = SlotComposition.UnionByTime(group, perResource);
             if (union.Count == 0)
             {
                 intersection = new List<UtcSlot>();
                 break;
             }
 
-            intersection = IntersectSlots(intersection, union);
+            intersection = SlotComposition.IntersectByTime(intersection, union);
             if (intersection.Count == 0)
             {
                 break;
@@ -152,7 +152,7 @@ public sealed class AvailabilityEngineV1
             resultSlots.Add(new UtcSlot(intersection[i].StartUtc, intersection[i].EndUtc, allResourceIds));
         }
 
-        resultSlots = NormalizeSlots(resultSlots);
+        resultSlots = SlotComposition.Normalize(resultSlots, mergeByResources: true);
         return new AvailabilityResult(resultSlots);
     }
 
@@ -317,148 +317,6 @@ public sealed class AvailabilityEngineV1
         }
 
         return result;
-    }
-
-    private static List<UtcSlot> IntersectSlots(IReadOnlyList<UtcSlot> first, IReadOnlyList<UtcSlot> second)
-    {
-        var result = new List<UtcSlot>();
-        var a = first;
-        var b = second;
-
-        var i = 0;
-        var j = 0;
-        while (i < a.Count && j < b.Count)
-        {
-            var start = a[i].StartUtc > b[j].StartUtc ? a[i].StartUtc : b[j].StartUtc;
-            var end = a[i].EndUtc < b[j].EndUtc ? a[i].EndUtc : b[j].EndUtc;
-
-            if (end > start)
-            {
-                result.Add(new UtcSlot(start, end, Array.Empty<int>()));
-            }
-
-            if (a[i].EndUtc <= b[j].EndUtc)
-            {
-                i++;
-            }
-            else
-            {
-                j++;
-            }
-        }
-
-        return result;
-    }
-
-    private static List<UtcSlot> NormalizeSlots(IReadOnlyList<UtcSlot> slots)
-    {
-        if (slots.Count == 0)
-        {
-            return new List<UtcSlot>();
-        }
-
-        var ordered = new List<UtcSlot>(slots);
-        ordered.Sort(SlotTimeComparer.Instance);
-
-        var normalized = new List<UtcSlot> { ordered[0] };
-        for (var index = 1; index < ordered.Count; index++)
-        {
-            var last = normalized[^1];
-            var current = ordered[index];
-
-            if (current.StartUtc <= last.EndUtc && SameResources(last.ResourceIds, current.ResourceIds))
-            {
-                var end = current.EndUtc > last.EndUtc ? current.EndUtc : last.EndUtc;
-                normalized[^1] = new UtcSlot(last.StartUtc, end, last.ResourceIds);
-            }
-            else
-            {
-                normalized.Add(current);
-            }
-        }
-
-        return normalized;
-    }
-
-    private static bool SameResources(IReadOnlyCollection<int> first, IReadOnlyCollection<int> second)
-    {
-        if (ReferenceEquals(first, second))
-        {
-            return true;
-        }
-
-        if (first.Count != second.Count)
-        {
-            return false;
-        }
-
-        using var firstEnumerator = first.GetEnumerator();
-        using var secondEnumerator = second.GetEnumerator();
-        while (firstEnumerator.MoveNext() && secondEnumerator.MoveNext())
-        {
-            if (firstEnumerator.Current != secondEnumerator.Current)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static List<UtcSlot> UnionSlots(
-        IReadOnlyList<int> resourceIds,
-        IReadOnlyDictionary<int, List<UtcSlot>> perResource)
-    {
-        var slots = new List<UtcSlot>();
-        for (var i = 0; i < resourceIds.Count; i++)
-        {
-            if (perResource.TryGetValue(resourceIds[i], out var resourceSlots))
-            {
-                var needed = slots.Count + resourceSlots.Count;
-                if (slots.Capacity < needed)
-                {
-                    slots.Capacity = needed;
-                }
-
-                for (var s = 0; s < resourceSlots.Count; s++)
-                {
-                    var slot = resourceSlots[s];
-                    slots.Add(new UtcSlot(slot.StartUtc, slot.EndUtc, Array.Empty<int>()));
-                }
-            }
-        }
-
-        return NormalizeSlotsByTime(slots);
-    }
-
-    private static List<UtcSlot> NormalizeSlotsByTime(IReadOnlyList<UtcSlot> slots)
-    {
-        if (slots.Count == 0)
-        {
-            return new List<UtcSlot>();
-        }
-
-        var ordered = new List<UtcSlot>(slots);
-        ordered.Sort(SlotTimeComparer.Instance);
-
-        var normalized = new List<UtcSlot> { ordered[0] };
-        for (var index = 1; index < ordered.Count; index++)
-        {
-            var last = normalized[^1];
-            var current = ordered[index];
-
-            if (current.StartUtc <= last.EndUtc)
-            {
-                var end = current.EndUtc > last.EndUtc ? current.EndUtc : last.EndUtc;
-                normalized[^1] = new UtcSlot(last.StartUtc, end, last.ResourceIds);
-            }
-            else
-            {
-                normalized.Add(current);
-            }
-        }
-
-        return normalized;
     }
 
     private static int ResolveCapacity(IReadOnlyDictionary<int, int> capacities, int resourceId)
