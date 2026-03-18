@@ -23,47 +23,8 @@ public sealed class PropertySchemaService : IPropertySchemaService
         }
 
         var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
-
-        var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
-        var definitionIds = new HashSet<int>();
-        var nodeDtos = new List<PropertyNodeDto>(nodes.Count);
-
-        for (var i = 0; i < nodes.Count; i++)
-        {
-            var node = nodes[i];
-            var definitionId = ResolveDefinitionId(node.Id, nodeMap);
-            if (node.ParentId == null)
-            {
-                definitionIds.Add(node.Id);
-            }
-            else
-            {
-                definitionIds.Add(definitionId);
-            }
-
-            nodeDtos.Add(new PropertyNodeDto(
-                node.Id,
-                definitionId,
-                node.ParentId,
-                node.Key,
-                node.Label,
-                node.SortOrder));
-        }
-
-        var definitions = nodeDtos
-            .Where(node => node.ParentId == null)
-            .Select(node => new PropertyDefinitionDto(
-                node.Id,
-                node.Key,
-                node.Label,
-                node.SortOrder))
-            .ToList();
-
-        var typeMappings = typeLinks
-            .Select(link => new ResourceTypePropertyDto(link.ResourceTypeId, link.PropertyDefinitionId))
-            .ToList();
-
-        return new PropertySchemaResponse(definitions, nodeDtos, typeMappings);
+        var snapshot = PropertySchemaSnapshot.Create(nodes, typeLinks);
+        return new PropertySchemaResponse(snapshot.Definitions, snapshot.Nodes, snapshot.TypeMappings);
     }
 
     public async Task ValidatePropertyFiltersAsync(
@@ -76,33 +37,8 @@ public sealed class PropertySchemaService : IPropertySchemaService
             return;
         }
 
-        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
-        var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
-        var definitionIds = new HashSet<int>();
-
-        for (var i = 0; i < propertyIds.Count; i++)
-        {
-            var propertyId = propertyIds[i];
-            if (!nodeMap.ContainsKey(propertyId))
-            {
-                throw new AvailabilityRequestException($"propertyIds contains unknown id {propertyId}.");
-            }
-
-            definitionIds.Add(ResolveDefinitionId(propertyId, nodeMap));
-        }
-
-        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
-        var typeDefinitionMap = new Dictionary<int, HashSet<int>>();
-        for (var i = 0; i < typeLinks.Count; i++)
-        {
-            var link = typeLinks[i];
-            if (!typeDefinitionMap.TryGetValue(link.ResourceTypeId, out var defs))
-            {
-                defs = new HashSet<int>();
-                typeDefinitionMap[link.ResourceTypeId] = defs;
-            }
-            defs.Add(link.PropertyDefinitionId);
-        }
+        var snapshot = await LoadSnapshotAsync(ct).ConfigureAwait(false);
+        var definitionIds = snapshot.ResolveDefinitionIds(propertyIds, "propertyIds");
 
         var assignments = await _queryService.GetResourceTypeAssignmentsAsync(resourceIds, ct)
             .ConfigureAwait(false);
@@ -110,20 +46,7 @@ public sealed class PropertySchemaService : IPropertySchemaService
         for (var i = 0; i < assignments.Count; i++)
         {
             var assignment = assignments[i];
-            if (!typeDefinitionMap.TryGetValue(assignment.ResourceTypeId, out var allowed))
-            {
-                throw new AvailabilityRequestException(
-                    $"Resource type {assignment.ResourceTypeId} does not allow requested properties.");
-            }
-
-            foreach (var definitionId in definitionIds)
-            {
-                if (!allowed.Contains(definitionId))
-                {
-                    throw new AvailabilityRequestException(
-                        $"propertyIds are not compatible with resource type {assignment.ResourceTypeId}.");
-                }
-            }
+            snapshot.ValidateTypeCompatibility(assignment.ResourceTypeId, definitionIds);
         }
     }
 
@@ -137,48 +60,9 @@ public sealed class PropertySchemaService : IPropertySchemaService
             return;
         }
 
-        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
-        var nodeMap = nodes.ToDictionary(node => node.Id, node => node);
-        var definitionIds = new HashSet<int>();
-
-        for (var i = 0; i < propertyIds.Count; i++)
-        {
-            var propertyId = propertyIds[i];
-            if (!nodeMap.ContainsKey(propertyId))
-            {
-                throw new AvailabilityRequestException($"propertyIds contains unknown id {propertyId}.");
-            }
-
-            definitionIds.Add(ResolveDefinitionId(propertyId, nodeMap));
-        }
-
-        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
-        var typeDefinitionMap = new Dictionary<int, HashSet<int>>();
-        for (var i = 0; i < typeLinks.Count; i++)
-        {
-            var link = typeLinks[i];
-            if (!typeDefinitionMap.TryGetValue(link.ResourceTypeId, out var defs))
-            {
-                defs = new HashSet<int>();
-                typeDefinitionMap[link.ResourceTypeId] = defs;
-            }
-            defs.Add(link.PropertyDefinitionId);
-        }
-
-        if (!typeDefinitionMap.TryGetValue(resourceTypeId, out var allowed))
-        {
-            throw new AvailabilityRequestException(
-                $"Resource type {resourceTypeId} does not allow requested properties.");
-        }
-
-        foreach (var definitionId in definitionIds)
-        {
-            if (!allowed.Contains(definitionId))
-            {
-                throw new AvailabilityRequestException(
-                    $"propertyIds are not compatible with resource type {resourceTypeId}.");
-            }
-        }
+        var snapshot = await LoadSnapshotAsync(ct).ConfigureAwait(false);
+        var definitionIds = snapshot.ResolveDefinitionIds(propertyIds, "propertyIds");
+        snapshot.ValidateTypeCompatibility(resourceTypeId, definitionIds);
     }
 
     public Task<IReadOnlyList<ResourceTypeAssignment>> GetResourceTypeAssignmentsAsync(
@@ -188,16 +72,17 @@ public sealed class PropertySchemaService : IPropertySchemaService
         return _queryService.GetResourceTypeAssignmentsAsync(resourceIds, ct);
     }
 
-    private static int ResolveDefinitionId(
-        int nodeId,
-        IReadOnlyDictionary<int, PropertySchemaNode> nodeMap)
+    private async Task<PropertySchemaSnapshot> LoadSnapshotAsync(CancellationToken ct)
     {
-        var current = nodeMap[nodeId];
-        while (current.ParentId != null && nodeMap.TryGetValue(current.ParentId.Value, out var parent))
+        var nodes = await _queryService.GetPropertyNodesAsync(ct).ConfigureAwait(false);
+        if (nodes.Count == 0)
         {
-            current = parent;
+            return PropertySchemaSnapshot.Create(
+                Array.Empty<PropertySchemaNode>(),
+                Array.Empty<ResourceTypePropertyLink>());
         }
 
-        return current.Id;
+        var typeLinks = await _queryService.GetResourceTypePropertiesAsync(ct).ConfigureAwait(false);
+        return PropertySchemaSnapshot.Create(nodes, typeLinks);
     }
 }
