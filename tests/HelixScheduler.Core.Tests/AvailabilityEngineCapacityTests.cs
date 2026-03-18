@@ -15,7 +15,7 @@ public sealed class AvailabilityEngineCapacityTests
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 9, 11);
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
                 resourceId)
@@ -40,7 +40,7 @@ public sealed class AvailabilityEngineCapacityTests
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 9, 11);
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
                 resourceId)
@@ -65,11 +65,11 @@ public sealed class AvailabilityEngineCapacityTests
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 9, 11);
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
                 resourceId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 30, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 30, 0, DateTimeKind.Utc),
                 resourceId)
@@ -96,15 +96,15 @@ public sealed class AvailabilityEngineCapacityTests
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 9, 11);
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
                 resourceId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 30, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 30, 0, DateTimeKind.Utc),
                 resourceId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
                 resourceId)
@@ -139,11 +139,11 @@ public sealed class AvailabilityEngineCapacityTests
 
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
                 resourceA),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
                 resourceB)
@@ -161,9 +161,9 @@ public sealed class AvailabilityEngineCapacityTests
         Assert.Equal(new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc), result.Slots[0].EndUtc);
     }
 
-    private static RuleModel SingleDateRule(long id, int resourceId, DateOnly date, int startHour, int endHour)
+    private static AvailabilityRule SingleDateRule(long id, int resourceId, DateOnly date, int startHour, int endHour)
     {
-        return new RuleModel(
+        return new AvailabilityRule(
             id,
             RuleKind.SingleDate,
             isExclude: false,
@@ -178,3 +178,4 @@ public sealed class AvailabilityEngineCapacityTests
             resourceId: resourceId);
     }
 }
+

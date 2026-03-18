@@ -13,8 +13,7 @@ public class AvailabilityBenchmarks
 {
     private AvailabilityEngine _engine = null!;
     private AvailabilityQuery _query = null!;
-    private List<SchedulingRule> _rules = null!;
-    private List<BusySlot> _busySlots = null!;
+    private AvailabilityInputs _inputs = null!;
 
     [ParamsSource(nameof(Scenarios))]
     public BenchmarkScenario Scenario { get; set; } = null!;
@@ -23,13 +22,13 @@ public class AvailabilityBenchmarks
     public void Setup()
     {
         _engine = new AvailabilityEngine();
-        BuildScenario(Scenario, out _query, out _rules, out _busySlots);
+        BuildScenario(Scenario, out _query, out _inputs);
     }
 
     [Benchmark]
     public AvailabilityResult Compute()
     {
-        return _engine.Compute(_query, _rules, _busySlots);
+        return _engine.Compute(_query, _inputs);
     }
 
     public static IEnumerable<BenchmarkScenario> Scenarios()
@@ -48,8 +47,7 @@ public class AvailabilityBenchmarks
     private static void BuildScenario(
         BenchmarkScenario scenario,
         out AvailabilityQuery query,
-        out List<SchedulingRule> rules,
-        out List<BusySlot> busySlots)
+        out AvailabilityInputs inputs)
     {
         var totalResources = scenario.RequiredCount + (scenario.OrGroupCount * scenario.OrGroupSize);
         var resourceIds = Enumerable.Range(1, totalResources).ToArray();
@@ -70,58 +68,66 @@ public class AvailabilityBenchmarks
 
         query = new AvailabilityQuery(period, requiredIds, resourceOrGroups: orGroups);
 
-        rules = BuildRules(resourceIds, period);
-        busySlots = BuildBusySlots(resourceIds, period, scenario.BusyDensity, scenario.Seed);
+        var rules = BuildRules(resourceIds, period);
+        var busySlots = BuildBusySlots(resourceIds, period, scenario.BusyDensity, scenario.Seed);
+        inputs = new AvailabilityInputs(rules, busySlots);
     }
 
-    private static List<SchedulingRule> BuildRules(IReadOnlyList<int> resourceIds, DatePeriod period)
+    private static List<AvailabilityRule> BuildRules(IReadOnlyList<int> resourceIds, DatePeriod period)
     {
-        var rules = new List<SchedulingRule>();
+        var rules = new List<AvailabilityRule>();
         var weekdays = DaysMask(DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday);
+        long ruleId = 1;
 
         for (var i = 0; i < resourceIds.Count; i++)
         {
             var resourceId = resourceIds[i];
-            rules.Add(new SchedulingRule(
-                SchedulingRuleKind.Weekly,
+            rules.Add(new AvailabilityRule(
+                ruleId++,
+                RuleKind.RecurringWeekly,
                 isExclude: false,
-                fromDateUtc: period.From,
-                toDateUtc: period.To,
-                singleDateUtc: null,
-                timeRange: new TimeRange(TimeSpan.FromHours(9), TimeSpan.FromHours(17)),
+                fromDate: period.From,
+                toDate: period.To,
+                singleDate: null,
+                startTime: TimeSpan.FromHours(9),
+                endTime: TimeSpan.FromHours(17),
                 daysOfWeekMask: weekdays,
                 dayOfMonth: null,
                 intervalDays: null,
-                resourceIds: new[] { resourceId }));
+                resourceId: resourceId));
 
             if (i % 4 == 0)
             {
-                rules.Add(new SchedulingRule(
-                    SchedulingRuleKind.Weekly,
+                rules.Add(new AvailabilityRule(
+                    ruleId++,
+                    RuleKind.RecurringWeekly,
                     isExclude: true,
-                    fromDateUtc: period.From,
-                    toDateUtc: period.To,
-                    singleDateUtc: null,
-                    timeRange: new TimeRange(TimeSpan.FromHours(12), TimeSpan.FromHours(13)),
+                    fromDate: period.From,
+                    toDate: period.To,
+                    singleDate: null,
+                    startTime: TimeSpan.FromHours(12),
+                    endTime: TimeSpan.FromHours(13),
                     daysOfWeekMask: weekdays,
                     dayOfMonth: null,
                     intervalDays: null,
-                    resourceIds: new[] { resourceId }));
+                    resourceId: resourceId));
             }
 
             if (i % 5 == 0)
             {
-                rules.Add(new SchedulingRule(
-                    SchedulingRuleKind.SingleDate,
+                rules.Add(new AvailabilityRule(
+                    ruleId++,
+                    RuleKind.SingleDate,
                     isExclude: true,
-                    fromDateUtc: null,
-                    toDateUtc: null,
-                    singleDateUtc: period.From.AddDays(Math.Min(2, period.To.DayNumber - period.From.DayNumber)),
-                    timeRange: new TimeRange(TimeSpan.FromHours(15), TimeSpan.FromHours(16)),
+                    fromDate: null,
+                    toDate: null,
+                    singleDate: period.From.AddDays(Math.Min(2, period.To.DayNumber - period.From.DayNumber)),
+                    startTime: TimeSpan.FromHours(15),
+                    endTime: TimeSpan.FromHours(16),
                     daysOfWeekMask: null,
                     dayOfMonth: null,
                     intervalDays: null,
-                    resourceIds: new[] { resourceId }));
+                    resourceId: resourceId));
             }
         }
 
@@ -156,7 +162,7 @@ public class AvailabilityBenchmarks
                 var startHour = 9 + random.Next(0, 6);
                 var start = DateTime.SpecifyKind(day.ToDateTime(new TimeOnly(startHour, 0)), DateTimeKind.Utc);
                 var end = DateTime.SpecifyKind(day.ToDateTime(new TimeOnly(startHour, 30)), DateTimeKind.Utc);
-                busySlots.Add(new BusySlot(resourceId, start, end));
+                busySlots.Add(new BusySlot(start, end, resourceId));
             }
         }
 

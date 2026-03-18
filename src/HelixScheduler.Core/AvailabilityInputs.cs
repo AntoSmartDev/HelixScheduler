@@ -5,25 +5,13 @@ namespace HelixScheduler.Core;
 /// </summary>
 public sealed class AvailabilityInputs
 {
-    /// <summary>
-    /// Scheduler rules, already expressed in UTC dates/times.
-    /// </summary>
-    public IReadOnlyList<RuleModel> Rules { get; }
-    /// <summary>
-    /// Busy slots for resources, expressed in UTC.
-    /// </summary>
-    public IReadOnlyList<BusySlotModel> BusySlots { get; }
-    /// <summary>
-    /// Optional per-resource capacity; values &lt; 1 are treated as 1.
-    /// </summary>
+    public IReadOnlyList<AvailabilityRule> Rules { get; }
+    public IReadOnlyList<BusySlot> BusySlots { get; }
     public IReadOnlyDictionary<int, int> ResourceCapacities { get; }
 
-    /// <summary>
-    /// Builds a new input bundle for the availability engine.
-    /// </summary>
     public AvailabilityInputs(
-        IReadOnlyList<RuleModel> rules,
-        IReadOnlyList<BusySlotModel> busySlots,
+        IReadOnlyList<AvailabilityRule> rules,
+        IReadOnlyList<BusySlot> busySlots,
         IReadOnlyDictionary<int, int>? resourceCapacities = null)
     {
         if (rules != null)

@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Exporters;
@@ -121,7 +121,7 @@ public class AvailabilityOptimizationBenchmarks
         int ruleCount,
         int busyCount)
     {
-        var rules = new List<RuleModel>(ruleCount + 2);
+        var rules = new List<AvailabilityRule>(ruleCount + 2);
         var random = new Random(1000 + ruleCount + busyCount);
         var daySpan = period.To.DayNumber - period.From.DayNumber;
 
@@ -132,7 +132,7 @@ public class AvailabilityOptimizationBenchmarks
             var startHour = 8 + (i % 7);
             var durationHours = (i % 3 == 0) ? 2 : 3;
             var isExclude = i % 5 == 0;
-            rules.Add(new RuleModel(
+            rules.Add(new AvailabilityRule(
                 i + 1,
                 RuleKind.SingleDate,
                 isExclude,
@@ -147,10 +147,10 @@ public class AvailabilityOptimizationBenchmarks
                 resourceId));
         }
 
-        rules.Add(new RuleModel(900001, RuleKind.SingleDate, false, null, null, period.From, TimeSpan.FromHours(8), TimeSpan.FromHours(18), null, null, null, AncestorAId));
-        rules.Add(new RuleModel(900002, RuleKind.SingleDate, false, null, null, period.From, TimeSpan.FromHours(8), TimeSpan.FromHours(18), null, null, null, AncestorBId));
+        rules.Add(new AvailabilityRule(900001, RuleKind.SingleDate, false, null, null, period.From, TimeSpan.FromHours(8), TimeSpan.FromHours(18), null, null, null, AncestorAId));
+        rules.Add(new AvailabilityRule(900002, RuleKind.SingleDate, false, null, null, period.From, TimeSpan.FromHours(8), TimeSpan.FromHours(18), null, null, null, AncestorBId));
 
-        var busy = new List<BusySlotModel>(busyCount);
+        var busy = new List<BusySlot>(busyCount);
         for (var i = 0; i < busyCount; i++)
         {
             var resourceId = allResourceIds[random.Next(allResourceIds.Count)];
@@ -159,7 +159,7 @@ public class AvailabilityOptimizationBenchmarks
             var minute = random.Next(0, 2) * 30;
             var lengthMinutes = (random.Next(0, 3) + 1) * 30;
             var startUtc = DateTime.SpecifyKind(day.ToDateTime(new TimeOnly(startHour, minute)), DateTimeKind.Utc);
-            busy.Add(new BusySlotModel(startUtc, startUtc.AddMinutes(lengthMinutes), resourceId));
+            busy.Add(new BusySlot(startUtc, startUtc.AddMinutes(lengthMinutes), resourceId));
         }
 
         return new AvailabilityInputs(rules, busy, new Dictionary<int, int>());
@@ -521,7 +521,7 @@ public class AvailabilityOptimizationBenchmarks
 
     private static class SharedCoreLogic
     {
-        public static List<UtcSlot> GenerateOccurrences(RuleModel rule, DatePeriod period)
+        public static List<UtcSlot> GenerateOccurrences(AvailabilityRule rule, DatePeriod period)
         {
             return rule.Kind switch
             {
@@ -565,7 +565,7 @@ public class AvailabilityOptimizationBenchmarks
             return normalized;
         }
 
-        private static List<UtcSlot> GenerateWeekly(RuleModel rule, DatePeriod period)
+        private static List<UtcSlot> GenerateWeekly(AvailabilityRule rule, DatePeriod period)
         {
             if (rule.DaysOfWeekMask == null)
             {
@@ -585,7 +585,7 @@ public class AvailabilityOptimizationBenchmarks
             return slots;
         }
 
-        private static List<UtcSlot> GenerateSingleDate(RuleModel rule, DatePeriod period)
+        private static List<UtcSlot> GenerateSingleDate(AvailabilityRule rule, DatePeriod period)
         {
             if (rule.SingleDate == null || rule.SingleDate.Value < period.From || rule.SingleDate.Value > period.To)
             {
@@ -595,7 +595,7 @@ public class AvailabilityOptimizationBenchmarks
             return new List<UtcSlot> { CreateSlot(rule.SingleDate.Value, rule) };
         }
 
-        private static List<UtcSlot> GenerateRange(RuleModel rule, DatePeriod period)
+        private static List<UtcSlot> GenerateRange(AvailabilityRule rule, DatePeriod period)
         {
             var from = rule.FromDate ?? period.From;
             var to = rule.ToDate ?? period.To;
@@ -615,7 +615,7 @@ public class AvailabilityOptimizationBenchmarks
             return slots;
         }
 
-        private static UtcSlot CreateSlot(DateOnly date, RuleModel rule)
+        private static UtcSlot CreateSlot(DateOnly date, AvailabilityRule rule)
         {
             var start = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.StartTime)), DateTimeKind.Utc);
             var end = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.EndTime)), DateTimeKind.Utc);
@@ -742,3 +742,4 @@ public class AvailabilityOptimizationBenchmarks
         }
     }
 }
+

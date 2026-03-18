@@ -1,4 +1,4 @@
-﻿using HelixScheduler.Core;
+using HelixScheduler.Core;
 using Xunit;
 
 namespace HelixScheduler.Core.Tests;
@@ -21,7 +21,7 @@ public sealed class AvailabilityEngineCanonicalTests
 
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 16, 0, 0, DateTimeKind.Utc),
                 doctorId)
@@ -53,11 +53,11 @@ public sealed class AvailabilityEngineCanonicalTests
 
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 12, 14, 30, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 12, 15, 0, 0, DateTimeKind.Utc),
                 doctorId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 12, 14, 30, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 12, 15, 0, 0, DateTimeKind.Utc),
                 roomId)
@@ -83,15 +83,15 @@ public sealed class AvailabilityEngineCanonicalTests
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 14, 18);
         var busy = new[]
         {
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 16, 0, 0, DateTimeKind.Utc),
                 resourceId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 18, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 19, 0, 0, DateTimeKind.Utc),
                 resourceId),
-            new BusySlotModel(
+            new BusySlot(
                 new DateTime(2025, 3, 10, 8, 0, 0, DateTimeKind.Utc),
                 new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc),
                 resourceId)
@@ -121,7 +121,7 @@ public sealed class AvailabilityEngineCanonicalTests
         };
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlot>()));
 
         Assert.Single(result.Slots);
         Assert.Equal(new DateTime(2025, 3, 10, 14, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
@@ -135,7 +135,7 @@ public sealed class AvailabilityEngineCanonicalTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var negative = new RuleModel(
+        var negative = new AvailabilityRule(
             1,
             RuleKind.SingleDate,
             isExclude: true,
@@ -150,7 +150,7 @@ public sealed class AvailabilityEngineCanonicalTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var result = engine.Compute(query, new AvailabilityInputs(new[] { negative }, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(new[] { negative }, Array.Empty<BusySlot>()));
 
         Assert.Empty(result.Slots);
     }
@@ -163,7 +163,7 @@ public sealed class AvailabilityEngineCanonicalTests
         var resourceId = 1;
 
         var rule = SingleDateRule(1, resourceId, new DateOnly(2025, 3, 10), 14, 18);
-        var busy = new BusySlotModel(
+        var busy = new BusySlot(
             new DateTime(2025, 3, 10, 14, 0, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 10, 18, 0, 0, DateTimeKind.Utc),
             resourceId);
@@ -181,7 +181,7 @@ public sealed class AvailabilityEngineCanonicalTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             1,
             RuleKind.Range,
             isExclude: false,
@@ -196,7 +196,7 @@ public sealed class AvailabilityEngineCanonicalTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlot>()));
 
         Assert.Equal(3, result.Slots.Count);
         Assert.Equal(new DateTime(2025, 3, 10, 8, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
@@ -210,7 +210,7 @@ public sealed class AvailabilityEngineCanonicalTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             1,
             RuleKind.SingleDate,
             isExclude: false,
@@ -225,7 +225,7 @@ public sealed class AvailabilityEngineCanonicalTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlot>()));
 
         Assert.Empty(result.Slots);
     }
@@ -237,7 +237,7 @@ public sealed class AvailabilityEngineCanonicalTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             1,
             RuleKind.RecurringWeekly,
             isExclude: false,
@@ -252,7 +252,7 @@ public sealed class AvailabilityEngineCanonicalTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlot>()));
 
         Assert.Empty(result.Slots);
     }
@@ -278,7 +278,7 @@ public sealed class AvailabilityEngineCanonicalTests
             new[] { requiredId },
             resourceOrGroups: new[] { new[] { resourceA, resourceB } });
 
-        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlot>()));
 
         Assert.Equal(2, result.Slots.Count);
         Assert.Equal(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
@@ -308,7 +308,7 @@ public sealed class AvailabilityEngineCanonicalTests
             new[] { requiredId },
             resourceOrGroups: new[] { new[] { resourceA, resourceB } });
 
-        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlotModel>()));
+        var result = engine.Compute(query, new AvailabilityInputs(rules, Array.Empty<BusySlot>()));
 
         Assert.Single(result.Slots);
         Assert.Equal(new DateTime(2025, 3, 10, 9, 0, 0, DateTimeKind.Utc), result.Slots[0].StartUtc);
@@ -335,7 +335,7 @@ public sealed class AvailabilityEngineCanonicalTests
             period,
             new[] { requiredId },
             resourceOrGroups: new[] { new[] { resourceA, resourceB } });
-        var inputs = new AvailabilityInputs(rules, Array.Empty<BusySlotModel>());
+        var inputs = new AvailabilityInputs(rules, Array.Empty<BusySlot>());
 
         var result = engine.Compute(query, inputs);
         var perResource = engine.ComputePerResourceAvailability(query, inputs);
@@ -375,9 +375,9 @@ public sealed class AvailabilityEngineCanonicalTests
         Assert.Equal(allResourceIds, normalized[0].ResourceIds.ToArray());
     }
 
-    private static RuleModel WeeklyRule(long id, int resourceId, params DayOfWeek[] days)
+    private static AvailabilityRule WeeklyRule(long id, int resourceId, params DayOfWeek[] days)
     {
-        return new RuleModel(
+        return new AvailabilityRule(
             id,
             RuleKind.RecurringWeekly,
             isExclude: false,
@@ -392,9 +392,9 @@ public sealed class AvailabilityEngineCanonicalTests
             resourceId: resourceId);
     }
 
-    private static RuleModel SingleDateRule(long id, int resourceId, DateOnly date, int startHour, int endHour)
+    private static AvailabilityRule SingleDateRule(long id, int resourceId, DateOnly date, int startHour, int endHour)
     {
-        return new RuleModel(
+        return new AvailabilityRule(
             id,
             RuleKind.SingleDate,
             isExclude: false,
@@ -420,4 +420,5 @@ public sealed class AvailabilityEngineCanonicalTests
         return mask;
     }
 }
+
 

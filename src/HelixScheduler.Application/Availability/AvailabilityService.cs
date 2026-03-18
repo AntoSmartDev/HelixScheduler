@@ -436,7 +436,7 @@ public sealed class AvailabilityService : IAvailabilityService
             .GetResourceCapacitiesAsync(resourceIdList, ct)
             .ConfigureAwait(false);
 
-        var ruleModels = new List<RuleModel>();
+        var ruleModels = new List<AvailabilityRule>();
         var period = new DatePeriod(request.FromDate, request.ToDate);
         var hasPositive = false;
         var hasNegative = false;
@@ -457,7 +457,7 @@ public sealed class AvailabilityService : IAvailabilityService
                     continue;
                 }
 
-                var model = new RuleModel(
+                var model = new AvailabilityRule(
                     rule.Id,
                     (RuleKind)rule.Kind,
                     rule.IsExclude,
@@ -491,7 +491,7 @@ public sealed class AvailabilityService : IAvailabilityService
             .GetBusyEventsAsync(fromUtc, toUtcExclusive, resourceIdList, ct)
             .ConfigureAwait(false);
 
-        var busySlots = new List<BusySlotModel>();
+        var busySlots = new List<BusySlot>();
         for (var i = 0; i < busyEvents.Count; i++)
         {
             var busyEvent = busyEvents[i];
@@ -505,7 +505,7 @@ public sealed class AvailabilityService : IAvailabilityService
 
                 var startUtc = DateTime.SpecifyKind(busyEvent.StartUtc, DateTimeKind.Utc);
                 var endUtc = DateTime.SpecifyKind(busyEvent.EndUtc, DateTimeKind.Utc);
-                busySlots.Add(new BusySlotModel(startUtc, endUtc, resourceId));
+                busySlots.Add(new BusySlot(startUtc, endUtc, resourceId));
             }
         }
 
@@ -1617,7 +1617,7 @@ public sealed class AvailabilityService : IAvailabilityService
             "Availability is blocked by rules or busy events.");
     }
 
-    private static bool RuleAppliesToPeriod(RuleModel rule, DatePeriod period)
+    private static bool RuleAppliesToPeriod(AvailabilityRule rule, DatePeriod period)
     {
         return rule.Kind switch
         {
@@ -1630,7 +1630,7 @@ public sealed class AvailabilityService : IAvailabilityService
         };
     }
 
-    private static bool WeeklyRuleApplies(RuleModel rule, DatePeriod period)
+    private static bool WeeklyRuleApplies(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.DaysOfWeekMask == null)
         {
@@ -1658,7 +1658,7 @@ public sealed class AvailabilityService : IAvailabilityService
         return false;
     }
 
-    private static bool SingleDateRuleApplies(RuleModel rule, DatePeriod period)
+    private static bool SingleDateRuleApplies(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.SingleDate == null)
         {
@@ -1669,14 +1669,14 @@ public sealed class AvailabilityService : IAvailabilityService
         return date >= period.From && date <= period.To;
     }
 
-    private static bool RangeRuleApplies(RuleModel rule, DatePeriod period)
+    private static bool RangeRuleApplies(AvailabilityRule rule, DatePeriod period)
     {
         var start = rule.FromDate ?? period.From;
         var end = rule.ToDate ?? period.To;
         return !(end < period.From || start > period.To);
     }
 
-    private static bool MonthlyRuleApplies(RuleModel rule, DatePeriod period)
+    private static bool MonthlyRuleApplies(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.DayOfMonth == null || rule.DayOfMonth <= 0 || rule.DayOfMonth > 31)
         {
@@ -1694,7 +1694,7 @@ public sealed class AvailabilityService : IAvailabilityService
         return false;
     }
 
-    private static bool RepeatingRuleApplies(RuleModel rule, DatePeriod period)
+    private static bool RepeatingRuleApplies(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.IntervalDays == null || rule.IntervalDays <= 0)
         {
@@ -1853,3 +1853,4 @@ public sealed class AvailabilityService : IAvailabilityService
         }
     }
 }
+

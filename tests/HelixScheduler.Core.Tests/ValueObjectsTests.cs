@@ -157,7 +157,7 @@ public sealed class ValueObjectsTests
         var start = new DateTime(2025, 1, 1, 9, 0, 0, DateTimeKind.Local);
         var end = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Local);
 
-        Assert.Throws<ArgumentException>(() => new BusySlot(1, start, end));
+        Assert.Throws<ArgumentException>(() => new BusySlot(start, end, 1));
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class ValueObjectsTests
         var start = new DateTime(2025, 1, 1, 9, 0, 0, DateTimeKind.Unspecified);
         var end = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Unspecified);
 
-        Assert.Throws<ArgumentException>(() => new BusySlot(1, start, end));
+        Assert.Throws<ArgumentException>(() => new BusySlot(start, end, 1));
     }
 
     [Fact]
@@ -198,3 +198,4 @@ public sealed class ValueObjectsTests
         Assert.Empty(query.PropertyFilters);
     }
 }
+

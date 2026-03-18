@@ -5,23 +5,11 @@ namespace HelixScheduler.Core;
 /// </summary>
 public sealed class BusySlot
 {
-    /// <summary>
-    /// Resource id for the busy interval.
-    /// </summary>
-    public int ResourceId { get; }
-    /// <summary>
-    /// Inclusive start in UTC.
-    /// </summary>
     public DateTime StartUtc { get; }
-    /// <summary>
-    /// Exclusive end in UTC.
-    /// </summary>
     public DateTime EndUtc { get; }
+    public int ResourceId { get; }
 
-    /// <summary>
-    /// Builds a new busy slot.
-    /// </summary>
-    public BusySlot(int resourceId, DateTime startUtc, DateTime endUtc)
+    public BusySlot(DateTime startUtc, DateTime endUtc, int resourceId)
     {
         if (endUtc <= startUtc)
         {
@@ -33,8 +21,8 @@ public sealed class BusySlot
             throw new ArgumentException("BusySlot requires UTC DateTime values.");
         }
 
-        ResourceId = resourceId;
         StartUtc = startUtc;
         EndUtc = endUtc;
+        ResourceId = resourceId;
     }
 }

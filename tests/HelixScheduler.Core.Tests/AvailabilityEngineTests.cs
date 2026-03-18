@@ -15,7 +15,7 @@ public sealed class AvailabilityEngineTests
 
         var rules = new[]
         {
-            new RuleModel(
+            new AvailabilityRule(
                 1,
                 RuleKind.RecurringWeekly,
                 isExclude: false,
@@ -28,7 +28,7 @@ public sealed class AvailabilityEngineTests
                 dayOfMonth: null,
                 intervalDays: null,
                 resourceId: doctorId),
-            new RuleModel(
+            new AvailabilityRule(
                 2,
                 RuleKind.RecurringWeekly,
                 isExclude: false,
@@ -43,7 +43,7 @@ public sealed class AvailabilityEngineTests
                 resourceId: roomId)
         };
 
-        var busyDoctor = new BusySlotModel(
+        var busyDoctor = new BusySlot(
             new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 10, 16, 0, 0, DateTimeKind.Utc),
             doctorId);
@@ -71,7 +71,7 @@ public sealed class AvailabilityEngineTests
 
         var rules = new[]
         {
-            new RuleModel(
+            new AvailabilityRule(
                 1,
                 RuleKind.RecurringWeekly,
                 isExclude: false,
@@ -84,7 +84,7 @@ public sealed class AvailabilityEngineTests
                 dayOfMonth: null,
                 intervalDays: null,
                 resourceId: doctorId),
-            new RuleModel(
+            new AvailabilityRule(
                 2,
                 RuleKind.RecurringWeekly,
                 isExclude: false,
@@ -99,12 +99,12 @@ public sealed class AvailabilityEngineTests
                 resourceId: roomId)
         };
 
-        var busyDoctor = new BusySlotModel(
+        var busyDoctor = new BusySlot(
             new DateTime(2025, 3, 12, 14, 30, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 12, 15, 0, 0, DateTimeKind.Utc),
             doctorId);
 
-        var busyRoom = new BusySlotModel(
+        var busyRoom = new BusySlot(
             new DateTime(2025, 3, 12, 14, 30, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 12, 15, 0, 0, DateTimeKind.Utc),
             roomId);
@@ -127,7 +127,7 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             1,
             RuleKind.SingleDate,
             isExclude: false,
@@ -141,12 +141,12 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceId: resourceId);
 
-        var busyInside = new BusySlotModel(
+        var busyInside = new BusySlot(
             new DateTime(2025, 3, 10, 10, 0, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
             resourceId);
 
-        var busyOutside = new BusySlotModel(
+        var busyOutside = new BusySlot(
             new DateTime(2025, 3, 10, 6, 0, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 10, 7, 0, 0, DateTimeKind.Utc),
             resourceId);
@@ -169,7 +169,7 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             1,
             RuleKind.SingleDate,
             isExclude: false,
@@ -183,7 +183,7 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceId: resourceId);
 
-        var busy = new BusySlotModel(
+        var busy = new BusySlot(
             new DateTime(2025, 3, 10, 12, 0, 0, DateTimeKind.Utc),
             new DateTime(2025, 3, 10, 13, 0, 0, DateTimeKind.Utc),
             resourceId);
@@ -204,7 +204,7 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var ruleA = new RuleModel(
+        var ruleA = new AvailabilityRule(
             1,
             RuleKind.SingleDate,
             isExclude: false,
@@ -218,7 +218,7 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceId: resourceId);
 
-        var ruleB = new RuleModel(
+        var ruleB = new AvailabilityRule(
             2,
             RuleKind.SingleDate,
             isExclude: false,
@@ -233,7 +233,7 @@ public sealed class AvailabilityEngineTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var inputs = new AvailabilityInputs(new[] { ruleA, ruleB }, Array.Empty<BusySlotModel>());
+        var inputs = new AvailabilityInputs(new[] { ruleA, ruleB }, Array.Empty<BusySlot>());
         var result = engine.Compute(query, inputs);
 
         Assert.Single(result.Slots);
@@ -248,7 +248,7 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new RuleModel(
+        var rule = new AvailabilityRule(
             99,
             RuleKind.Monthly,
             isExclude: false,
@@ -263,7 +263,7 @@ public sealed class AvailabilityEngineTests
             resourceId: resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
-        var inputs = new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlotModel>());
+        var inputs = new AvailabilityInputs(new[] { rule }, Array.Empty<BusySlot>());
 
         var result = engine.Compute(query, inputs);
 
@@ -279,8 +279,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var positive = new SchedulingRule(
-            SchedulingRuleKind.Range,
+        var positive = CreateRule(
+            RuleKind.Range,
             isExclude: false,
             fromDateUtc: new DateOnly(2025, 3, 10),
             toDateUtc: new DateOnly(2025, 3, 10),
@@ -291,8 +291,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceId });
 
-        var negative = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var negative = CreateRule(
+            RuleKind.SingleDate,
             isExclude: true,
             fromDateUtc: null,
             toDateUtc: null,
@@ -321,8 +321,8 @@ public sealed class AvailabilityEngineTests
         var roomId = 1;
         var doctorId = 7;
 
-        var roomRule = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var roomRule = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -333,8 +333,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { roomId });
 
-        var doctorRule = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var doctorRule = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -360,8 +360,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var rule = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -373,9 +373,9 @@ public sealed class AvailabilityEngineTests
             resourceIds: new[] { resourceId });
 
         var busy = new BusySlot(
-            resourceId,
             new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc),
-            new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc));
+            new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc),
+            resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
         var result = engine.Compute(query, new[] { rule }, new[] { busy });
@@ -394,8 +394,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Repeating,
+        var rule = CreateRule(
+            RuleKind.Repeating,
             isExclude: false,
             fromDateUtc: new DateOnly(2025, 3, 9),
             toDateUtc: new DateOnly(2025, 3, 16),
@@ -421,8 +421,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Repeating,
+        var rule = CreateRule(
+            RuleKind.Repeating,
             isExclude: false,
             fromDateUtc: new DateOnly(2025, 3, 10),
             toDateUtc: new DateOnly(2025, 3, 16),
@@ -448,8 +448,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 1, 1), new DateOnly(2025, 3, 31));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Monthly,
+        var rule = CreateRule(
+            RuleKind.Monthly,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -475,8 +475,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Weekly,
+        var rule = CreateRule(
+            RuleKind.RecurringWeekly,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -503,8 +503,8 @@ public sealed class AvailabilityEngineTests
         var resourceA = 1;
         var resourceB = 2;
 
-        var ruleA = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var ruleA = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -515,8 +515,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceA });
 
-        var ruleB = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var ruleB = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -541,8 +541,8 @@ public sealed class AvailabilityEngineTests
         var resourceA = 1;
         var resourceB = 2;
 
-        var ruleA = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var ruleA = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -553,8 +553,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceA });
 
-        var ruleB = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var ruleB = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -580,8 +580,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var positive = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var positive = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -592,8 +592,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceId });
 
-        var negative = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var negative = CreateRule(
+            RuleKind.SingleDate,
             isExclude: true,
             fromDateUtc: null,
             toDateUtc: null,
@@ -605,9 +605,9 @@ public sealed class AvailabilityEngineTests
             resourceIds: new[] { resourceId });
 
         var busy = new BusySlot(
-            resourceId,
             new DateTime(2025, 3, 10, 15, 0, 0, DateTimeKind.Utc),
-            new DateTime(2025, 3, 10, 16, 0, 0, DateTimeKind.Utc));
+            new DateTime(2025, 3, 10, 16, 0, 0, DateTimeKind.Utc),
+            resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
         var result = engine.Compute(query, new[] { positive, negative }, new[] { busy });
@@ -628,8 +628,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 12));
         var resourceId = 1;
 
-        var openStart = new SchedulingRule(
-            SchedulingRuleKind.Range,
+        var openStart = CreateRule(
+            RuleKind.Range,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: new DateOnly(2025, 3, 11),
@@ -640,8 +640,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceId });
 
-        var openEnd = new SchedulingRule(
-            SchedulingRuleKind.Range,
+        var openEnd = CreateRule(
+            RuleKind.Range,
             isExclude: false,
             fromDateUtc: new DateOnly(2025, 3, 11),
             toDateUtc: null,
@@ -667,8 +667,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var positive = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var positive = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -679,8 +679,8 @@ public sealed class AvailabilityEngineTests
             intervalDays: null,
             resourceIds: new[] { resourceId });
 
-        var negative = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var negative = CreateRule(
+            RuleKind.SingleDate,
             isExclude: true,
             fromDateUtc: null,
             toDateUtc: null,
@@ -704,8 +704,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var rule = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -717,9 +717,9 @@ public sealed class AvailabilityEngineTests
             resourceIds: new[] { resourceId });
 
         var busy = new BusySlot(
-            resourceId,
             new DateTime(2025, 3, 10, 12, 0, 0, DateTimeKind.Utc),
-            new DateTime(2025, 3, 10, 13, 0, 0, DateTimeKind.Utc));
+            new DateTime(2025, 3, 10, 13, 0, 0, DateTimeKind.Utc),
+            resourceId);
 
         var query = new AvailabilityQuery(period, new[] { resourceId });
         var result = engine.Compute(query, new[] { rule }, new[] { busy });
@@ -736,8 +736,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 2, 1), new DateOnly(2025, 2, 28));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Monthly,
+        var rule = CreateRule(
+            RuleKind.Monthly,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -761,8 +761,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Weekly,
+        var rule = CreateRule(
+            RuleKind.RecurringWeekly,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -786,8 +786,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 16));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.Repeating,
+        var rule = CreateRule(
+            RuleKind.Repeating,
             isExclude: false,
             fromDateUtc: new DateOnly(2025, 3, 10),
             toDateUtc: new DateOnly(2025, 3, 16),
@@ -811,8 +811,8 @@ public sealed class AvailabilityEngineTests
         var period = new DatePeriod(new DateOnly(2025, 3, 10), new DateOnly(2025, 3, 10));
         var resourceId = 1;
 
-        var rule = new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        var rule = CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -925,6 +925,37 @@ public sealed class AvailabilityEngineTests
         Assert.Equal(new DateTime(2025, 3, 10, 11, 0, 0, DateTimeKind.Utc), result.Slots[0].EndUtc);
     }
 
+    private static AvailabilityRule CreateRule(
+        RuleKind kind,
+        bool isExclude,
+        DateOnly? fromDateUtc,
+        DateOnly? toDateUtc,
+        DateOnly? singleDateUtc,
+        TimeRange timeRange,
+        int? daysOfWeekMask,
+        int? dayOfMonth,
+        int? intervalDays,
+        IReadOnlyList<int> resourceIds)
+    {
+        if (resourceIds == null || resourceIds.Count != 1)
+        {
+            throw new ArgumentException("Tests expect exactly one resource id.", nameof(resourceIds));
+        }
+
+        return new AvailabilityRule(
+            id: 0,
+            kind: kind,
+            isExclude: isExclude,
+            fromDate: fromDateUtc,
+            toDate: toDateUtc,
+            singleDate: singleDateUtc,
+            startTime: timeRange.Start,
+            endTime: timeRange.End,
+            daysOfWeekMask: daysOfWeekMask,
+            dayOfMonth: dayOfMonth,
+            intervalDays: intervalDays,
+            resourceId: resourceIds[0]);
+    }
     private static int DaysMask(params DayOfWeek[] days)
     {
         var mask = 0;
@@ -936,10 +967,10 @@ public sealed class AvailabilityEngineTests
         return mask;
     }
 
-    private static SchedulingRule CreateSingleDateRule(int resourceId, int startHour, int endHour)
+    private static AvailabilityRule CreateSingleDateRule(int resourceId, int startHour, int endHour)
     {
-        return new SchedulingRule(
-            SchedulingRuleKind.SingleDate,
+        return CreateRule(
+            RuleKind.SingleDate,
             isExclude: false,
             fromDateUtc: null,
             toDateUtc: null,
@@ -951,3 +982,13 @@ public sealed class AvailabilityEngineTests
             resourceIds: new[] { resourceId });
     }
 }
+
+
+internal static class AvailabilityEngineTestExtensions
+{
+    public static AvailabilityResult Compute(this AvailabilityEngine engine, AvailabilityQuery query, IReadOnlyList<AvailabilityRule> rules, IReadOnlyList<BusySlot> busySlots)
+    {
+        return engine.Compute(query, new AvailabilityInputs(rules, busySlots));
+    }
+}
+

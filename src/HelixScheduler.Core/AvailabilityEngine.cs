@@ -1,8 +1,7 @@
 namespace HelixScheduler.Core;
 
 /// <summary>
-/// Canonical availability engine based on RuleModel/BusySlotModel inputs.
-/// Also exposes a compatibility overload for legacy SchedulingRule/BusySlot callers.
+/// Canonical availability engine based on AvailabilityRule/BusySlot inputs.
 /// </summary>
 public sealed class AvailabilityEngine
 {
@@ -158,7 +157,7 @@ public sealed class AvailabilityEngine
     }
 
     /// <summary>
-    /// Computes availability from normalized RuleModel/BusySlotModel inputs.
+    /// Computes availability from normalized AvailabilityRule/BusySlot inputs.
     /// </summary>
     public AvailabilityResult Compute(AvailabilityQuery query, AvailabilityInputs inputs)
     {
@@ -168,52 +167,7 @@ public sealed class AvailabilityEngine
         var perResource = ComputePerResourceAvailability(query, inputs);
         return ComposeAvailability(query, perResource);
     }
-
-    /// <summary>
-    /// Compatibility overload for callers that still use SchedulingRule/BusySlot inputs.
-    /// </summary>
-    public AvailabilityResult Compute(
-        AvailabilityQuery query,
-        IReadOnlyList<SchedulingRule> rules,
-        IReadOnlyList<BusySlot> busySlots)
-    {
-        if (query == null) throw new ArgumentNullException(nameof(query));
-        if (rules == null) throw new ArgumentNullException(nameof(rules));
-        if (busySlots == null) throw new ArgumentNullException(nameof(busySlots));
-
-        var normalizedRules = new List<RuleModel>();
-        for (var i = 0; i < rules.Count; i++)
-        {
-            var rule = rules[i];
-            for (var r = 0; r < rule.ResourceIds.Count; r++)
-            {
-                normalizedRules.Add(new RuleModel(
-                    id: i + 1,
-                    kind: MapRuleKind(rule.Kind),
-                    isExclude: rule.IsExclude,
-                    fromDate: rule.FromDateUtc,
-                    toDate: rule.ToDateUtc,
-                    singleDate: rule.SingleDateUtc,
-                    startTime: rule.TimeRange.Start,
-                    endTime: rule.TimeRange.End,
-                    daysOfWeekMask: rule.DaysOfWeekMask,
-                    dayOfMonth: rule.DayOfMonth,
-                    intervalDays: rule.IntervalDays,
-                    resourceId: rule.ResourceIds[r]));
-            }
-        }
-
-        var normalizedBusy = new List<BusySlotModel>(busySlots.Count);
-        for (var i = 0; i < busySlots.Count; i++)
-        {
-            var busy = busySlots[i];
-            normalizedBusy.Add(new BusySlotModel(busy.StartUtc, busy.EndUtc, busy.ResourceId));
-        }
-
-        return Compute(query, new AvailabilityInputs(normalizedRules, normalizedBusy, new Dictionary<int, int>()));
-    }
-
-    private static List<UtcSlot> GenerateOccurrences(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateOccurrences(AvailabilityRule rule, DatePeriod period)
     {
         return rule.Kind switch
         {
@@ -226,7 +180,7 @@ public sealed class AvailabilityEngine
         };
     }
 
-    private static List<UtcSlot> GenerateWeekly(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateWeekly(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.DaysOfWeekMask == null)
         {
@@ -245,7 +199,7 @@ public sealed class AvailabilityEngine
         return slots;
     }
 
-    private static List<UtcSlot> GenerateSingleDate(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateSingleDate(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.SingleDate == null)
         {
@@ -261,7 +215,7 @@ public sealed class AvailabilityEngine
         return new List<UtcSlot> { CreateSlot(date, rule) };
     }
 
-    private static List<UtcSlot> GenerateRange(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateRange(AvailabilityRule rule, DatePeriod period)
     {
         var from = rule.FromDate ?? period.From;
         var to = rule.ToDate ?? period.To;
@@ -283,7 +237,7 @@ public sealed class AvailabilityEngine
         return slots;
     }
 
-    private static List<UtcSlot> GenerateMonthly(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateMonthly(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.DayOfMonth == null || rule.DayOfMonth <= 0 || rule.DayOfMonth > 31)
         {
@@ -302,7 +256,7 @@ public sealed class AvailabilityEngine
         return slots;
     }
 
-    private static List<UtcSlot> GenerateRepeating(RuleModel rule, DatePeriod period)
+    private static List<UtcSlot> GenerateRepeating(AvailabilityRule rule, DatePeriod period)
     {
         if (rule.IntervalDays == null || rule.IntervalDays <= 0)
         {
@@ -336,7 +290,7 @@ public sealed class AvailabilityEngine
         return slots;
     }
 
-    private static UtcSlot CreateSlot(DateOnly date, RuleModel rule)
+    private static UtcSlot CreateSlot(DateOnly date, AvailabilityRule rule)
     {
         var start = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.StartTime)), DateTimeKind.Utc);
         var end = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.FromTimeSpan(rule.EndTime)), DateTimeKind.Utc);
@@ -417,36 +371,16 @@ public sealed class AvailabilityEngine
         return result;
     }
 
-    private static RuleKind MapRuleKind(SchedulingRuleKind kind)
+    private static int ResolveCapacity(IReadOnlyDictionary<int, int> resourceCapacities, int resourceId)
     {
-        return kind switch
+        if (resourceCapacities.TryGetValue(resourceId, out var capacity) && capacity > 1)
         {
-            SchedulingRuleKind.Weekly => RuleKind.RecurringWeekly,
-            SchedulingRuleKind.Monthly => RuleKind.Monthly,
-            SchedulingRuleKind.SingleDate => RuleKind.SingleDate,
-            SchedulingRuleKind.Range => RuleKind.Range,
-            SchedulingRuleKind.Repeating => RuleKind.Repeating,
-            _ => throw new NotSupportedException($"SchedulingRuleKind {kind} is not supported.")
-        };
-    }
-
-    private static int ResolveCapacity(IReadOnlyDictionary<int, int> capacities, int resourceId)
-    {
-        if (capacities.Count == 0)
-        {
-            return 1;
-        }
-
-        if (capacities.TryGetValue(resourceId, out var capacity))
-        {
-            return capacity < 1 ? 1 : capacity;
+            return capacity;
         }
 
         return 1;
-    }
-
-    private static List<UtcSlot> BuildCapacityBlocks(
-        IReadOnlyList<BusySlotModel> busySlots,
+    }    private static List<UtcSlot> BuildCapacityBlocks(
+        IReadOnlyList<BusySlot> busySlots,
         int resourceId,
         int capacity)
     {
@@ -498,15 +432,15 @@ public sealed class AvailabilityEngine
         return blocks;
     }
 
-    private static Dictionary<int, List<RuleModel>> GroupRulesByResource(IReadOnlyList<RuleModel> rules)
+    private static Dictionary<int, List<AvailabilityRule>> GroupRulesByResource(IReadOnlyList<AvailabilityRule> rules)
     {
-        var grouped = new Dictionary<int, List<RuleModel>>();
+        var grouped = new Dictionary<int, List<AvailabilityRule>>();
         for (var i = 0; i < rules.Count; i++)
         {
             var rule = rules[i];
             if (!grouped.TryGetValue(rule.ResourceId, out var resourceRules))
             {
-                resourceRules = new List<RuleModel>();
+                resourceRules = new List<AvailabilityRule>();
                 grouped[rule.ResourceId] = resourceRules;
             }
 
@@ -516,15 +450,15 @@ public sealed class AvailabilityEngine
         return grouped;
     }
 
-    private static Dictionary<int, List<BusySlotModel>> GroupBusyByResource(IReadOnlyList<BusySlotModel> busySlots)
+    private static Dictionary<int, List<BusySlot>> GroupBusyByResource(IReadOnlyList<BusySlot> busySlots)
     {
-        var grouped = new Dictionary<int, List<BusySlotModel>>();
+        var grouped = new Dictionary<int, List<BusySlot>>();
         for (var i = 0; i < busySlots.Count; i++)
         {
             var busy = busySlots[i];
             if (!grouped.TryGetValue(busy.ResourceId, out var resourceBusy))
             {
-                resourceBusy = new List<BusySlotModel>();
+                resourceBusy = new List<BusySlot>();
                 grouped[busy.ResourceId] = resourceBusy;
             }
 
@@ -562,3 +496,7 @@ public sealed class AvailabilityEngine
         }
     }
 }
+
+
+
+
