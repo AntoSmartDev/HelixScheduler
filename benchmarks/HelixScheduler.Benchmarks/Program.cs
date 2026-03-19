@@ -7,6 +7,8 @@ BenchmarkSwitcher
         typeof(AvailabilityOptimizationBenchmarks),
         typeof(CapacityHotPathBenchmarks),
         typeof(AncestorExpansionBenchmarks),
+        typeof(AncestorFilterBenchmarks),
+        typeof(PropertySchemaBenchmarks),
         typeof(ApplicationBenchmarks),
         typeof(EndToEndBenchmarks)
     })

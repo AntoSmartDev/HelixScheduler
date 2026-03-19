@@ -284,6 +284,45 @@ public sealed class AvailabilityScenarioTests
     }
 
     [Fact]
+    public async Task PropertyFilterGroups_Or_Within_Groups_And_Between_Groups_Reduces_To_SiteA()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 12),
+            ToDate: new DateOnly(2026, 1, 12),
+            RequiredResourceIds: Array.Empty<int>(),
+            PropertyFilterGroups: new[]
+            {
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.LocationRomeId },
+                    MatchMode: "or"),
+                new PropertyFilterGroup(
+                    new[] { DemoPropertySchemaQueryService.AccreditationIsoId, DemoPropertySchemaQueryService.AccreditationSoc2Id },
+                    MatchMode: "or")
+            },
+            ResourceOrGroups: new[]
+            {
+                new[]
+                {
+                    DemoAvailabilityQueryService.SiteAId,
+                    DemoAvailabilityQueryService.SiteBId
+                }
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+
+        Assert.Contains(result.Slots, slot =>
+            slot.ResourceIds.Count == 1 &&
+            slot.ResourceIds.Contains(DemoAvailabilityQueryService.SiteAId) &&
+            slot.StartUtc == new DateTime(2026, 1, 12, 14, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 15, 0, 0, DateTimeKind.Utc));
+        Assert.Contains(result.Slots, slot =>
+            slot.ResourceIds.Count == 1 &&
+            slot.ResourceIds.Contains(DemoAvailabilityQueryService.SiteAId) &&
+            slot.StartUtc == new DateTime(2026, 1, 12, 16, 0, 0, DateTimeKind.Utc) &&
+            slot.EndUtc == new DateTime(2026, 1, 12, 18, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
     public async Task PropertyFilterGroups_IncludeDescendants_Or_Matches_Imaging_Rooms()
     {
         var request = new AvailabilityComputeRequest(
@@ -546,7 +585,7 @@ public sealed class AvailabilityScenarioTests
 
         private static readonly Dictionary<int, List<int>> PropertyLinks = new()
         {
-            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId },
+            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId, DemoPropertySchemaQueryService.AccreditationSoc2Id },
             [SiteBId] = new List<int> { DemoPropertySchemaQueryService.LocationRomeId },
             [Room1Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
             [Room2Id] = new List<int> { DemoPropertySchemaQueryService.MriId },
@@ -711,6 +750,7 @@ public sealed class AvailabilityScenarioTests
 
         public const int AccreditationRootId = 130;
         public const int AccreditationIsoId = 131;
+        public const int AccreditationSoc2Id = 132;
 
         public static readonly List<PropertySchemaNode> PropertyNodes = new()
         {
@@ -726,7 +766,8 @@ public sealed class AvailabilityScenarioTests
             new PropertySchemaNode(LocationMilanId, LocationRootId, "Location", "Milan", 1),
             new PropertySchemaNode(LocationRomeId, LocationRootId, "Location", "Rome", 2),
             new PropertySchemaNode(AccreditationRootId, null, "Accreditation", "Accreditation", null),
-            new PropertySchemaNode(AccreditationIsoId, AccreditationRootId, "Accreditation", "ISO 9001", 1)
+            new PropertySchemaNode(AccreditationIsoId, AccreditationRootId, "Accreditation", "ISO 9001", 1),
+            new PropertySchemaNode(AccreditationSoc2Id, AccreditationRootId, "Accreditation", "SOC2", 2)
         };
 
         private static readonly List<ResourceTypePropertyLink> TypeLinks = new()

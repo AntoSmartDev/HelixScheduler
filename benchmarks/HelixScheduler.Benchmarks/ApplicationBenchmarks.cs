@@ -79,6 +79,29 @@ public class ApplicationBenchmarks
                         }
                     })),
             new AppScenario(
+                "App_PropertyGroups_OrWithin_AndBetween",
+                () => new AvailabilityComputeRequest(
+                    monday,
+                    monday,
+                    Array.Empty<int>(),
+                    PropertyFilterGroups: new[]
+                    {
+                        new PropertyFilterGroup(
+                            new[] { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.LocationRomeId },
+                            MatchMode: "or"),
+                        new PropertyFilterGroup(
+                            new[] { DemoPropertySchemaQueryService.AccreditationIsoId, DemoPropertySchemaQueryService.AccreditationSoc2Id },
+                            MatchMode: "or")
+                    },
+                    ResourceOrGroups: new[]
+                    {
+                        new[]
+                        {
+                            DemoAvailabilityQueryService.SiteAId,
+                            DemoAvailabilityQueryService.SiteBId
+                        }
+                    })),
+            new AppScenario(
                 "App_SlotDuration",
                 () => new AvailabilityComputeRequest(
                     friday,
@@ -163,7 +186,7 @@ public class ApplicationBenchmarks
 
         private static readonly Dictionary<int, List<int>> PropertyLinks = new()
         {
-            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId },
+            [SiteAId] = new List<int> { DemoPropertySchemaQueryService.LocationMilanId, DemoPropertySchemaQueryService.AccreditationIsoId, DemoPropertySchemaQueryService.AccreditationSoc2Id },
             [SiteBId] = new List<int> { DemoPropertySchemaQueryService.LocationRomeId },
             [Room1Id] = new List<int> { DemoPropertySchemaQueryService.OctId },
             [Room2Id] = new List<int> { DemoPropertySchemaQueryService.MriId },
@@ -323,6 +346,7 @@ public class ApplicationBenchmarks
 
         public const int AccreditationRootId = 130;
         public const int AccreditationIsoId = 131;
+        public const int AccreditationSoc2Id = 132;
 
         public static readonly List<PropertySchemaNode> PropertyNodes = new()
         {
@@ -338,7 +362,8 @@ public class ApplicationBenchmarks
             new PropertySchemaNode(LocationMilanId, LocationRootId, "Location", "Milan", 1),
             new PropertySchemaNode(LocationRomeId, LocationRootId, "Location", "Rome", 2),
             new PropertySchemaNode(AccreditationRootId, null, "Accreditation", "Accreditation", null),
-            new PropertySchemaNode(AccreditationIsoId, AccreditationRootId, "Accreditation", "ISO 9001", 1)
+            new PropertySchemaNode(AccreditationIsoId, AccreditationRootId, "Accreditation", "ISO 9001", 1),
+            new PropertySchemaNode(AccreditationSoc2Id, AccreditationRootId, "Accreditation", "SOC2", 2)
         };
 
         private static readonly List<ResourceTypePropertyLink> TypeLinks = new()

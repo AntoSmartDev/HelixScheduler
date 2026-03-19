@@ -141,6 +141,49 @@ public sealed class AncestorFilterTests
     }
 
     [Fact]
+    public async Task AncestorFilters_MatchAllAncestors_Fails_When_One_Eligible_Ancestor_Does_Not_Match()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: new[] { 401 },
+            IncludeResourceAncestors: true,
+            AncestorFilters: new[]
+            {
+                new AncestorPropertyFilter(
+                    ResourceTypeId: 1,
+                    PropertyIds: new[] { 11 },
+                    MatchAllAncestors: true,
+                    Scope: "anyAncestor")
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.Empty(result.Slots);
+    }
+
+    [Fact]
+    public async Task AncestorFilters_MatchAllAncestors_Passes_When_All_Eligible_Ancestors_Match()
+    {
+        var request = new AvailabilityComputeRequest(
+            FromDate: new DateOnly(2026, 1, 6),
+            ToDate: new DateOnly(2026, 1, 6),
+            RequiredResourceIds: new[] { 401 },
+            IncludeResourceAncestors: true,
+            AncestorFilters: new[]
+            {
+                new AncestorPropertyFilter(
+                    ResourceTypeId: 1,
+                    PropertyIds: new[] { 11, 12 },
+                    MatchMode: "or",
+                    MatchAllAncestors: true,
+                    Scope: "anyAncestor")
+            });
+
+        var result = await _service.ComputeAsync(request, CancellationToken.None);
+        Assert.NotEmpty(result.Slots);
+    }
+
+    [Fact]
     public async Task AncestorFilters_Invalid_MatchMode_Throws()
     {
         var request = new AvailabilityComputeRequest(
@@ -168,6 +211,7 @@ public sealed class AncestorFilterTests
             [102] = 1,
             [201] = 3,
             [301] = 2,
+            [401] = 2,
             [302] = 2
         };
 
@@ -177,7 +221,9 @@ public sealed class AncestorFilterTests
             new ResourceRelationLink(101, 201, "Contains"),
             new ResourceRelationLink(201, 301, "Contains"),
             new ResourceRelationLink(100, 102, "Contains"),
-            new ResourceRelationLink(102, 302, "Contains")
+            new ResourceRelationLink(102, 302, "Contains"),
+            new ResourceRelationLink(101, 401, "Contains"),
+            new ResourceRelationLink(102, 401, "Contains")
         };
 
         private static readonly Dictionary<int, List<int>> PropertyLinks = new()
