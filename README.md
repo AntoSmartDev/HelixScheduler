@@ -35,31 +35,6 @@ This keeps the model explicit and predictable, and avoids treating multi-resourc
 
 ---
 
-# Demo Preview
-
-HelixScheduler includes a small read-only demo application that shows how the engine can be queried and explored through WebApi endpoints.
-
-<div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
-    <div style="flex: 1; min-width: 320px;">
-      <h3>Availability Explorer</h3>
-      <div style="height: 350px;overflow: hidden;border: 1px solid #ddd;border-radius: 8px;">
-		<a target="_blank" rel="noopener noreferrer" href="/AntoSmartDev/HelixScheduler/blob/main/assets/screenshots/explorer.jpeg">
-			<img src="/AntoSmartDev/HelixScheduler/raw/main/assets/screenshots/explorer.jpeg" alt="Explorer" style="object-fit: cover; object-position: top;">
-		</a>
-      </div>
-    </div>
-
-	<div style="flex: 1; min-width: 320px;">
-      <h3>Search Availability</h3>
-		<div style="height: 350px; overflow: hidden; border: 1px solid #ddd; border-radius: 8px;">
-			<a target="_blank" rel="noopener noreferrer" href="/AntoSmartDev/HelixScheduler/blob/main/assets/screenshots/availability.jpeg">
-				<img src="/AntoSmartDev/HelixScheduler/raw/main/assets/screenshots/availability.jpeg" alt="Availability" style="object-fit: cover; object-position: top;">
-			</a>
-		</div>
-	</div>
-</div>
-
----
 
 ## Determinism
 
