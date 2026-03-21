@@ -33,6 +33,10 @@ public sealed class BusyEventsConfiguration : IEntityTypeConfiguration<BusyEvent
         builder.Property(busyEvent => busyEvent.EventType)
             .HasMaxLength(50);
 
+        builder.Property(busyEvent => busyEvent.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(busyEvent => busyEvent.CreatedAtUtc)
             .HasColumnType("datetime2")
             .IsRequired();

@@ -132,6 +132,7 @@ public sealed class AvailabilityComputeQueryService : IAvailabilityComputeQueryS
         var rows = await _dbContext.BusyEventResources
             .AsNoTracking()
             .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link => link.BusyEvent.IsActive)
             .Where(link => link.BusyEvent.StartUtc < toUtcExclusive && link.BusyEvent.EndUtc > fromUtc)
             .Select(link => new
             {
