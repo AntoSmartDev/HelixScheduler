@@ -18,7 +18,8 @@ public sealed class ResourceCatalogQueryService : IResourceCatalogQueryService
         CancellationToken ct)
     {
         IQueryable<Resources> query = _dbContext.Resources
-            .AsNoTracking();
+            .AsNoTracking()
+            .Where(resource => resource.IsActive && !resource.IsArchived && resource.Type.IsActive);
         if (onlySchedulable)
         {
             query = query.Where(resource => resource.IsSchedulable);

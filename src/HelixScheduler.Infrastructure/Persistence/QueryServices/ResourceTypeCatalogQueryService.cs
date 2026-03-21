@@ -16,6 +16,7 @@ public sealed class ResourceTypeCatalogQueryService : IResourceTypeCatalogQueryS
     {
         return await _dbContext.ResourceTypes
             .AsNoTracking()
+            .Where(type => type.IsActive)
             .OrderBy(type => type.SortOrder)
             .ThenBy(type => type.Label)
             .Select(type => new ResourceTypeDto(

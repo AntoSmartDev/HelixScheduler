@@ -36,6 +36,16 @@ public sealed class ResourcesConfiguration : IEntityTypeConfiguration<Resources>
         builder.Property(resource => resource.TypeId)
             .IsRequired();
 
+        builder.Property(resource => resource.IsActive)
+            .HasColumnType("bit")
+            .HasDefaultValue(true)
+            .IsRequired();
+
+        builder.Property(resource => resource.IsArchived)
+            .HasColumnType("bit")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(resource => resource.CreatedAtUtc)
             .HasColumnType("datetime2")
             .IsRequired();

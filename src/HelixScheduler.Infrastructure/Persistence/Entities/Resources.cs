@@ -9,6 +9,8 @@ public sealed class Resources
     public bool IsSchedulable { get; set; }
     public int Capacity { get; set; }
     public int TypeId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsArchived { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
     public ResourceTypes Type { get; set; } = null!;

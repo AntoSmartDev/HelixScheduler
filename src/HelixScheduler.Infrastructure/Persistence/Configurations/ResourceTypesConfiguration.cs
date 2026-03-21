@@ -26,6 +26,11 @@ public sealed class ResourceTypesConfiguration : IEntityTypeConfiguration<Resour
 
         builder.Property(type => type.SortOrder);
 
+        builder.Property(type => type.IsActive)
+            .HasColumnType("bit")
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.HasOne<Tenants>()
             .WithMany()
             .HasForeignKey(type => type.TenantId)
