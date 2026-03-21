@@ -1,10 +1,14 @@
 # HelixScheduler
 
-**Deterministic scheduling engine for real-world resource planning on modern .NET**
+**Deterministic scheduling and availability engine for real-world resource planning on modern .NET**
 
-HelixScheduler is designed to be the logical core of planning systems: the place where availability is defined once and computed correctly, even in the presence of complex rules, organizational hierarchies, concurrent capacity, and structural constraints.
+HelixScheduler is a domain-agnostic deterministic scheduling and availability engine for resource planning systems. It computes real availability across complex rules, resource hierarchies, capacity constraints, busy events, and structural filters.
+
+It is designed to be the logical core of planning systems: the place where availability is defined once and computed correctly.
 
 Rendering a calendar is easy. Computing what can actually be shown is not.
+
+Ideal for systems that need reliable availability computation for multi-resource scheduling, appointment planning, facility planning, or other constraint-aware planning scenarios.
 
 ---
 
@@ -13,14 +17,47 @@ Rendering a calendar is easy. Computing what can actually be shown is not.
 HelixScheduler is a core scheduling engine designed to:
 
 - model resource availability
-- apply recurring rules and exceptions
+- apply structural rules and exclusions
 - consider unavailability and real-world busy slots
-- combine multiple resources together
+- combine required and alternative resources into coherent availability results
 - return truly usable time slots
+- apply grouped property filters with OR-within-group and AND-between-group semantics
+- evaluate ancestor-based structural constraints
+- support explainable availability results
 
 Its purpose is to solve, in a coherent and explainable way, the most critical part of scheduling and booking systems:
 
 > computing correctly when a combination of resources is actually available.
+
+Availability is computed per resource first, and only then combined across the requested resources.
+
+This keeps the model explicit and predictable, and avoids treating multi-resource bookings as opaque monolithic events.
+
+---
+
+# Demo Preview
+
+HelixScheduler includes a small read-only demo application that shows how the engine can be queried and explored through WebApi endpoints.
+
+<div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 320px;">
+      <h3>Availability Explorer</h3>
+      <div style="height: 350px;overflow: hidden;border: 1px solid #ddd;border-radius: 8px;">
+		<a target="_blank" rel="noopener noreferrer" href="/AntoSmartDev/HelixScheduler/blob/main/assets/screenshots/explorer.jpeg">
+			<img src="/AntoSmartDev/HelixScheduler/raw/main/assets/screenshots/explorer.jpeg" alt="Explorer" style="object-fit: cover; object-position: top;">
+		</a>
+      </div>
+    </div>
+
+	<div style="flex: 1; min-width: 320px;">
+      <h3>Search Availability</h3>
+		<div style="height: 350px; overflow: hidden; border: 1px solid #ddd; border-radius: 8px;">
+			<a target="_blank" rel="noopener noreferrer" href="/AntoSmartDev/HelixScheduler/blob/main/assets/screenshots/availability.jpeg">
+				<img src="/AntoSmartDev/HelixScheduler/raw/main/assets/screenshots/availability.jpeg" alt="Availability" style="object-fit: cover; object-position: top;">
+			</a>
+		</div>
+	</div>
+</div>
 
 ---
 
@@ -58,8 +95,27 @@ Implementing these rules directly on calendar events quickly leads to:
 
 HelixScheduler separates availability logic from user interfaces and booking management.
 
-The engine computes. The application decides how to use the result.
+A key design choice is the separation between structural availability and operational occupancy.
 
+Structural availability is expressed through rules and exclusions.
+Operational occupancy is expressed through normalized busy slots derived from real bookings or domain events.
+
+This keeps the engine compact, deterministic, and domain-agnostic while still reflecting real usage.
+
+The engine computes. The application decides how to use the result.
+  
+---
+
+# Why Adopt HelixScheduler
+
+HelixScheduler is useful when a system needs to:
+
+- compute real availability instead of rendering naive calendar openings
+- combine structural rules and real operational occupancy in one deterministic model
+- support multi-resource scheduling without opaque event coupling
+- apply structural constraints from organizational hierarchies and property filters
+- explain availability decisions in a way that operators and developers can verify
+  
 ---
 
 ## Model Scalability
@@ -90,6 +146,8 @@ The result is a system that is:
 - more coherent
 - more predictable
 
+This keeps the scheduling model compact even when operational booking volume grows.
+
 ---
 
 # Core Concepts
@@ -108,9 +166,9 @@ Everything is a resource:
 
 Resources can be organized in hierarchical relations:
 
-- Site -> Room
-- Department -> Doctor
-- Facility -> Clinic
+- Site → Room
+- Department → Doctor
+- Facility → Clinic
 
 You can request that the calculation also accounts for ancestor availability (`includeResourceAncestors`).
 
@@ -122,19 +180,33 @@ This enables proper modeling of:
 
 Without duplicating unavailability on child resources.
 
+This is especially valuable in organizational models where structural constraints live above the schedulable resource itself.
+
 ---
 
 ## Rules
 
-Rules define structural availability.
+Rules define structural availability and unavailability.
 
-Examples:
+Supported rule shapes include:
 
-- Mon-Fri 09:00-18:00
-- Tuesdays only
+- recurring weekly rules
+- single-date rules
+- date-range rules
+- monthly rules
+- repeating interval-based rules
+
+This allows the engine to model not only weekly business calendars, but also more irregular recurring availability patterns that often appear in real operations.
+
+Rules may also be open-ended or bounded by explicit date ranges.
+
+Examples include:
+
 - every first Monday of the month
 - until a certain date
 - no end date
+
+Rules can be positive or negative, allowing the engine to model both structural availability and structural blocks without materializing future events.
 
 Recurrence is optional: it is a feature, not a requirement.
 
@@ -160,6 +232,8 @@ In real systems, busy slots derive from domain bookings and can be projected or 
 
 They represent real resource usage.
 
+This keeps domain events outside the engine while preserving a deterministic and normalized computation model.
+
 A confirmed booking generates a busy slot.
 
 Busy slots:
@@ -180,10 +254,10 @@ Each resource can have a capacity.
 
 Examples:
 
-- doctor -> 1
-- mobile ultrasound -> 1
-- laboratory -> 3
-- classroom -> 20
+- doctor → 1
+- mobile ultrasound → 1
+- laboratory → 3
+- classroom → 20
 
 Availability is computed as:
 
@@ -201,11 +275,20 @@ Resources can have properties organized in categories and hierarchies.
 Example:
 
 Diagnostics
--> Ultrasound
--> X-ray
--> CT
+→ Ultrasound
+→ X-ray
+→ CT
 
 With `includeDescendants` you can filter by a category and automatically include all specializations.
+
+Property filters can also be grouped to express richer structural constraints.
+
+This allows scenarios such as:
+
+- OR within a group (`Milan OR Rome`)
+- AND between groups (`(Milan OR Rome) AND (ISO9001 OR SOC2)`)
+
+Ancestor-aware property filters can also be applied when constraints live on the organizational context rather than on the schedulable resource itself.
 
 ---
 
@@ -274,16 +357,29 @@ The engine can select only resources whose organizational context satisfies cons
 
 ---
 
+## Filtering with grouped property constraints
+
+A request may require a resource that belongs to:
+
+- a site in Milan or Rome
+- and an accredited site with ISO 9001 or SOC2
+
+This is modeled through grouped property filters with OR semantics inside each group and AND semantics across groups.
+
+The result is a precise structural selection before availability is computed.
+
+---
+
 # Querying Availability
 
 Availability is requested by providing:
 
 - time range (date range, always UTC, date-only)
 - slot duration (`slotDurationMinutes`)
-- required resources
-- optional AND / OR groups
-- property filters
+- required resources and optional OR groups of alternative resources
+- grouped property filters with descendant-aware matching
 - ancestor filters
+- optional explainability output
 
 The engine returns coherent slots.
 
@@ -320,6 +416,8 @@ Availability is the result of an explicit combination of traceable elements.
 
 Each slot derives from an explicit set of rules and negative intervals (unavailability and busy slots) that can be verified.
 
+This is especially useful in systems where operators need to understand whether a slot was enabled by structural rules, removed by exclusions, or blocked by busy usage.
+
 ---
 
 # Multi-tenant
@@ -349,11 +447,11 @@ The engine remains deterministic and tenant-neutral.
 
 # Architecture
 
-- Core -> pure deterministic engine
-- Application -> orchestration
-- Infrastructure -> persistence and isolation
-- WebApi -> HTTP exposure
-- DemoWeb -> demo interface
+- Core → pure deterministic engine
+- Application → orchestration
+- Infrastructure → persistence and isolation
+- WebApi → HTTP exposure
+- DemoWeb → demo interface
 
 The Core is independent from databases, HTTP, or external frameworks.
 
@@ -374,7 +472,7 @@ Technical characteristics:
 
 - Core completely independent of the framework
 - Project-based architecture (Core / Application / Infrastructure / WebApi)
-- SQL Server support
+- SQL Server runtime support
 - Compatible with cross-platform environments (.NET runtime)
 
 The engine can be used:
@@ -389,25 +487,19 @@ The engine can be used:
 
 ## Prerequisites
 - .NET 10 SDK
-- SQL Server (default provider)
+- SQL Server (current runtime database)
 
 ## Database Setup
-The default provider is SQL Server. Configure the connection string in `appsettings.json` or environment variables.
+The current runtime setup uses SQL Server. Configure the connection string in `appsettings.json` or environment variables.
 
 Example `appsettings.json`:
 ```json
 {
   "ConnectionStrings": {
     "SchedulerDb": "Server=.\\SQLEXPRESS;Database=HelixScheduler;Trusted_Connection=True;TrustServerCertificate=True"
-  },
-  "HelixScheduler": {
-    "DatabaseProvider": "SqlServer"
   }
 }
 ```
-
-Note: SQLite support is currently disabled by configuration. Use SQL Server.
-
 
 ## Migrations 
 
@@ -560,8 +652,8 @@ The Availability page allows you to:
 - select a time range (UTC)
 - set slot duration (`slotMinutes`)
 - combine resources (AND / OR)
-- apply property filters (`includeDescendants`)
-- include ancestors (`includeResourceAncestors`)
+- apply grouped property filters, including descendant-aware matching (`includeDescendants`)
+- apply ancestor-aware constraints (`includeResourceAncestors`)
 - include or exclude remainder slots
 
 It calls:
@@ -580,7 +672,7 @@ It shows:
 
 ## Interaction Flow
 
-UI -> WebApi -> Application -> Core -> normalized result -> UI
+UI → WebApi → Application → Core → normalized result → UI
 
 The demo contains no computation logic.
 All availability is produced by the engine.
@@ -589,18 +681,20 @@ All availability is produced by the engine.
 
 # Project Status
 
-The conceptual model is consolidated:
+The current version establishes a cleaner and more complete architectural baseline for HelixScheduler, including a canonical Core surface and a more coherent Application/Infrastructure boundary.
 
-- resources
-- rules
-- unavailability
-- busy slots
-- capacity
-- hierarchies
-- semantic filters
-- multi-tenant
+The model now includes:
 
-HelixScheduler is designed to be integrated, extended, and maintained over time.
+- deterministic availability computation
+- grouped AND / OR resource selection
+- grouped property filters with OR-within-group and AND-between-group semantics
+- ancestor-aware constraints
+- recurring, single-date, range, monthly, and repeating rules
+- capacity-aware busy handling
+- explainability
+- multi-tenant isolation
+
+The project is designed to be integrated, extended, and maintained over time without coupling the scheduling engine to domain-specific application logic.
 
 ---
 
