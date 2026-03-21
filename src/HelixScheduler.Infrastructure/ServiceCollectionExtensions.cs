@@ -52,6 +52,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPropertyManagementStore, PropertyManagementStore>();
         services.AddScoped<IResourcePropertyAssignmentManagementStore, ResourcePropertyAssignmentManagementStore>();
         services.AddScoped<IResourceTypeManagementStore, ResourceTypeManagementStore>();
+        services.AddScoped<IResourceTypePropertySchemaManagementStore, ResourceTypePropertySchemaManagementStore>();
         services.AddScoped<IResourceManagementStore, ResourceManagementStore>();
         services.AddScoped<IRuleManagementStore, RuleManagementStore>();
         services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();

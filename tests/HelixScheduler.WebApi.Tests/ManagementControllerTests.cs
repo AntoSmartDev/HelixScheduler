@@ -197,6 +197,60 @@ public sealed class ManagementControllerTests
         Assert.Equal(3, listed.RootElement.GetArrayLength());
     }
 
+    [Fact]
+    public async Task ResourceType_PropertySchema_Endpoints_Work_EndToEnd()
+    {
+        await using var factory = new ManagementWebApplicationFactory();
+        var client = factory.CreateClient();
+        var uniqueKey = $"type-{Guid.NewGuid():N}";
+
+        var resourceTypeId = await CreateResourceTypeAsync(client, uniqueKey, "Room", 1);
+        var propertyOneId = await CreatePropertyAsync(client, "Capability", "Capability", 1);
+        var propertyTwoId = await CreatePropertyAsync(client, "Specialty", "Specialty", 2);
+
+        var assignResponse = await client.PostAsJsonAsync("/api/management/resource-types/property-definitions/assign", new
+        {
+            resourceTypeId,
+            propertyDefinitionIds = new[] { propertyOneId, propertyTwoId }
+        });
+        assignResponse.EnsureSuccessStatusCode();
+
+        using (var assignStream = await assignResponse.Content.ReadAsStreamAsync())
+        {
+            var assigned = await JsonDocument.ParseAsync(assignStream);
+            Assert.Equal(resourceTypeId, assigned.RootElement.GetProperty("resourceTypeId").GetInt32());
+            Assert.Equal(2, assigned.RootElement.GetProperty("propertyDefinitionIds").GetArrayLength());
+        }
+
+        var getResponse = await client.GetAsync($"/api/management/resource-types/{resourceTypeId}/property-definitions");
+        getResponse.EnsureSuccessStatusCode();
+
+        using (var getStream = await getResponse.Content.ReadAsStreamAsync())
+        {
+            var current = await JsonDocument.ParseAsync(getStream);
+            Assert.Equal(2, current.RootElement.GetProperty("propertyDefinitionIds").GetArrayLength());
+        }
+
+        var duplicateResponse = await client.PostAsJsonAsync("/api/management/resource-types/property-definitions/assign", new
+        {
+            resourceTypeId,
+            propertyDefinitionIds = new[] { propertyOneId }
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+
+        var removeResponse = await client.PostAsJsonAsync("/api/management/resource-types/property-definitions/remove", new
+        {
+            resourceTypeId,
+            propertyDefinitionIds = new[] { propertyOneId }
+        });
+        removeResponse.EnsureSuccessStatusCode();
+
+        using var removeStream = await removeResponse.Content.ReadAsStreamAsync();
+        var removed = await JsonDocument.ParseAsync(removeStream);
+        Assert.Equal(1, removed.RootElement.GetProperty("propertyDefinitionIds").GetArrayLength());
+    }
+
     private static async Task<int> CreateResourceTypeAsync(HttpClient client, string key, string label, int sortOrder)
     {
         var response = await client.PostAsJsonAsync("/api/management/resource-types", new { key, label, sortOrder });

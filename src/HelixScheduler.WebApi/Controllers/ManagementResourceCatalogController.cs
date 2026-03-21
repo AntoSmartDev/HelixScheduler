@@ -11,6 +11,7 @@ namespace HelixScheduler.WebApi.Controllers;
 public sealed class ManagementResourceCatalogController : ManagementControllerBase
 {
     private readonly IResourceTypeManagementService _resourceTypeService;
+    private readonly IResourceTypePropertySchemaManagementService _resourceTypePropertySchemaService;
     private readonly IResourceManagementService _resourceService;
     private readonly IHierarchyManagementService _hierarchyService;
     private readonly IPropertyManagementService _propertyService;
@@ -18,12 +19,14 @@ public sealed class ManagementResourceCatalogController : ManagementControllerBa
 
     public ManagementResourceCatalogController(
         IResourceTypeManagementService resourceTypeService,
+        IResourceTypePropertySchemaManagementService resourceTypePropertySchemaService,
         IResourceManagementService resourceService,
         IHierarchyManagementService hierarchyService,
         IPropertyManagementService propertyService,
         IResourcePropertyAssignmentManagementService resourcePropertyAssignmentService)
     {
         _resourceTypeService = resourceTypeService;
+        _resourceTypePropertySchemaService = resourceTypePropertySchemaService;
         _resourceService = resourceService;
         _hierarchyService = hierarchyService;
         _propertyService = propertyService;
@@ -68,6 +71,30 @@ public sealed class ManagementResourceCatalogController : ManagementControllerBa
     public async Task<ActionResult<ResourceTypeManagementDto>> DeactivateResourceTypeAsync(int resourceTypeId, CancellationToken ct = default)
     {
         return FromManagementResult(await _resourceTypeService.DeactivateResourceTypeAsync(resourceTypeId, ct));
+    }
+
+    [HttpPost("resource-types/property-definitions/assign")]
+    public async Task<ActionResult<ResourceTypePropertySchemaManagementDto>> AssignPropertyDefinitionsToResourceTypeAsync(
+        [FromBody] AssignPropertyDefinitionsToResourceTypeCommand command,
+        CancellationToken ct = default)
+    {
+        return FromManagementResult(await _resourceTypePropertySchemaService.AssignPropertyDefinitionsAsync(command, ct));
+    }
+
+    [HttpPost("resource-types/property-definitions/remove")]
+    public async Task<ActionResult<ResourceTypePropertySchemaManagementDto>> RemovePropertyDefinitionsFromResourceTypeAsync(
+        [FromBody] RemovePropertyDefinitionsFromResourceTypeCommand command,
+        CancellationToken ct = default)
+    {
+        return FromManagementResult(await _resourceTypePropertySchemaService.RemovePropertyDefinitionsAsync(command, ct));
+    }
+
+    [HttpGet("resource-types/{resourceTypeId:int}/property-definitions")]
+    public async Task<ActionResult<ResourceTypePropertySchemaManagementDto>> GetResourceTypePropertyDefinitionsAsync(
+        int resourceTypeId,
+        CancellationToken ct = default)
+    {
+        return FromManagementResult(await _resourceTypePropertySchemaService.GetPropertyDefinitionsAsync(resourceTypeId, ct));
     }
 
     [HttpPost("resources")]

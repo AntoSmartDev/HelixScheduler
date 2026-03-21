@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResourceCatalogService, ResourceCatalogService>();
         services.AddScoped<IResourceTypeCatalogService, ResourceTypeCatalogService>();
         services.AddScoped<IResourceTypeManagementService, ResourceTypeManagementService>();
+        services.AddScoped<IResourceTypePropertySchemaManagementService, ResourceTypePropertySchemaManagementService>();
         services.AddScoped<IResourceManagementService, ResourceManagementService>();
         services.AddScoped<IRuleManagementService, RuleManagementService>();
         services.AddScoped<IPropertySchemaService, PropertySchemaService>();

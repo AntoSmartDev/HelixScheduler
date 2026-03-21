@@ -260,6 +260,97 @@ public sealed class ResourceCatalogManagementServiceTests
         Assert.Equal("tenant.context.unresolved", resourceResult.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task ResourceType_PropertySchema_Management_Assigns_And_Removes_Definitions()
+    {
+        await using var provider = BuildServiceProvider();
+        var tenant = await SeedTenantsAsync(provider);
+        await SeedPropertyDefinitionsAsync(provider, tenant.CurrentTenant.Id);
+
+        var createdType = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypeManagementService>();
+            return await service.CreateResourceTypeAsync(
+                new CreateResourceTypeCommand("room", "Room", 1),
+                CancellationToken.None);
+        });
+
+        Assert.True(createdType.Succeeded);
+
+        var assigned = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypePropertySchemaManagementService>();
+            return await service.AssignPropertyDefinitionsAsync(
+                new AssignPropertyDefinitionsToResourceTypeCommand(createdType.Value!.Id, new[] { 100, 200 }),
+                CancellationToken.None);
+        });
+
+        Assert.True(assigned.Succeeded);
+        Assert.Equal(new[] { 100, 200 }, assigned.Value!.PropertyDefinitionIds);
+
+        var duplicate = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypePropertySchemaManagementService>();
+            return await service.AssignPropertyDefinitionsAsync(
+                new AssignPropertyDefinitionsToResourceTypeCommand(createdType.Value!.Id, new[] { 100 }),
+                CancellationToken.None);
+        });
+
+        Assert.False(duplicate.Succeeded);
+        Assert.Equal("resource-type.property-definition.duplicate", duplicate.Errors[0].Code);
+
+        var removed = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypePropertySchemaManagementService>();
+            return await service.RemovePropertyDefinitionsAsync(
+                new RemovePropertyDefinitionsFromResourceTypeCommand(createdType.Value!.Id, new[] { 100 }),
+                CancellationToken.None);
+        });
+
+        Assert.True(removed.Succeeded);
+        Assert.Equal(new[] { 200 }, removed.Value!.PropertyDefinitionIds);
+    }
+
+    [Fact]
+    public async Task ResourceType_PropertySchema_Management_Rejects_Missing_And_Inactive_Definitions()
+    {
+        await using var provider = BuildServiceProvider();
+        var tenant = await SeedTenantsAsync(provider);
+        await SeedPropertyDefinitionsAsync(provider, tenant.CurrentTenant.Id);
+
+        var createdType = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypeManagementService>();
+            return await service.CreateResourceTypeAsync(
+                new CreateResourceTypeCommand("device", "Device", 1),
+                CancellationToken.None);
+        });
+
+        Assert.True(createdType.Succeeded);
+
+        var missing = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypePropertySchemaManagementService>();
+            return await service.AssignPropertyDefinitionsAsync(
+                new AssignPropertyDefinitionsToResourceTypeCommand(createdType.Value!.Id, new[] { 999 }),
+                CancellationToken.None);
+        });
+
+        Assert.False(missing.Succeeded);
+        Assert.Equal("resource-type.property-definition.not-found", missing.Errors[0].Code);
+
+        var inactive = await ExecuteForTenantAsync(provider, tenant.CurrentTenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IResourceTypePropertySchemaManagementService>();
+            return await service.AssignPropertyDefinitionsAsync(
+                new AssignPropertyDefinitionsToResourceTypeCommand(createdType.Value!.Id, new[] { 300 }),
+                CancellationToken.None);
+        });
+
+        Assert.False(inactive.Succeeded);
+        Assert.Equal("resource-type.property-definition.inactive", inactive.Errors[0].Code);
+    }
+
     private static ServiceProvider BuildServiceProvider()
     {
         var services = new ServiceCollection();
@@ -270,8 +361,10 @@ public sealed class ResourceCatalogManagementServiceTests
         services.AddDbContext<SchedulerDbContext>(options => options.UseInMemoryDatabase(databaseName));
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IResourceTypeManagementStore, ResourceTypeManagementStore>();
+        services.AddScoped<IResourceTypePropertySchemaManagementStore, ResourceTypePropertySchemaManagementStore>();
         services.AddScoped<IResourceManagementStore, ResourceManagementStore>();
         services.AddScoped<IResourceTypeManagementService, ResourceTypeManagementService>();
+        services.AddScoped<IResourceTypePropertySchemaManagementService, ResourceTypePropertySchemaManagementService>();
         services.AddScoped<IResourceManagementService, ResourceManagementService>();
         services.AddScoped<IResourceCatalogQueryService, ResourceCatalogQueryService>();
         services.AddScoped<IResourceTypeCatalogQueryService, ResourceTypeCatalogQueryService>();
@@ -279,6 +372,24 @@ public sealed class ResourceCatalogManagementServiceTests
         services.AddScoped<IResourceTypeCatalogService, ResourceTypeCatalogService>();
 
         return services.BuildServiceProvider();
+    }
+
+    private static async Task SeedPropertyDefinitionsAsync(ServiceProvider provider, Guid tenantId)
+    {
+        using var scope = provider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SchedulerDbContext>();
+
+        if (await dbContext.ResourceProperties.AnyAsync(property => property.TenantId == tenantId))
+        {
+            return;
+        }
+
+        dbContext.ResourceProperties.AddRange(
+            new ResourceProperties { Id = 100, TenantId = tenantId, Key = "Capability", Label = "Capability", SortOrder = 1, IsActive = true },
+            new ResourceProperties { Id = 200, TenantId = tenantId, Key = "Specialty", Label = "Specialty", SortOrder = 2, IsActive = true },
+            new ResourceProperties { Id = 300, TenantId = tenantId, Key = "Legacy", Label = "Legacy", SortOrder = 3, IsActive = false });
+
+        await dbContext.SaveChangesAsync(CancellationToken.None);
     }
 
     private static async Task<TestTenantContext> SeedTenantsAsync(ServiceProvider provider)
