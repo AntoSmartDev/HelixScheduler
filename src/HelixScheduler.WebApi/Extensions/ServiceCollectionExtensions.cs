@@ -1,6 +1,7 @@
 using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.Demo;
+using HelixScheduler.Application.Hierarchy;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Application.ResourceCatalog.Management;
@@ -18,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IDemoReadService, DemoReadService>();
+        services.AddScoped<IHierarchyManagementService, HierarchyManagementService>();
         services.AddScoped<IResourceCatalogService, ResourceCatalogService>();
         services.AddScoped<IResourceTypeCatalogService, ResourceTypeCatalogService>();
         services.AddScoped<IResourceTypeManagementService, ResourceTypeManagementService>();
