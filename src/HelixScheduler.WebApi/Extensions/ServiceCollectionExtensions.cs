@@ -1,6 +1,7 @@
 using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.BusyEventManagement;
+using HelixScheduler.Application.CatalogRead;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Hierarchy;
 using HelixScheduler.Application.ManagementValidation;
@@ -23,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IBusyEventManagementService, BusyEventManagementService>();
+        services.AddScoped<IManagementCatalogReadService, ManagementCatalogReadService>();
         services.AddScoped<IDemoReadService, DemoReadService>();
         services.AddScoped<IHierarchyManagementService, HierarchyManagementService>();
         services.AddScoped<IManagementValidationService, ManagementValidationService>();

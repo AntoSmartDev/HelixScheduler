@@ -15,7 +15,9 @@ public sealed class AvailabilitySummaryQueryService : IAvailabilitySummaryQueryS
 
     public async Task<IReadOnlyList<ResourceSummary>> GetResourcesAsync(bool onlySchedulable, CancellationToken ct)
     {
-        var query = _dbContext.Resources.AsNoTracking();
+        var query = _dbContext.Resources
+            .AsNoTracking()
+            .Where(resource => resource.IsActive && !resource.IsArchived && resource.Type.IsActive);
         if (onlySchedulable)
         {
             query = query.Where(resource => resource.IsSchedulable);
@@ -123,6 +125,7 @@ public sealed class AvailabilitySummaryQueryService : IAvailabilitySummaryQueryS
         var rows = await _dbContext.BusyEventResources
             .AsNoTracking()
             .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link => link.BusyEvent.IsActive)
             .Where(link => link.BusyEvent.StartUtc < toUtcExclusive && link.BusyEvent.EndUtc > fromUtc)
             .Select(link => new
             {
