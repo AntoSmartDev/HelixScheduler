@@ -26,6 +26,10 @@ public sealed class RulesConfiguration : IEntityTypeConfiguration<Rules>
         builder.Property(rule => rule.Title)
             .HasMaxLength(300);
 
+        builder.Property(rule => rule.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(rule => rule.FromDateUtc)
             .HasColumnType("date");
 

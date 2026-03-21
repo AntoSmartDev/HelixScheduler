@@ -15,6 +15,7 @@ public sealed class Rules
     public int? DaysOfWeekMask { get; set; }
     public int? DayOfMonth { get; set; }
     public int? IntervalDays { get; set; }
+    public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; }
 
     public ICollection<RuleResources> RuleResources { get; } = new List<RuleResources>();

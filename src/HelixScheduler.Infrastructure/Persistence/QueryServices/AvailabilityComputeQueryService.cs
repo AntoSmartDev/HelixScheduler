@@ -27,6 +27,7 @@ public sealed class AvailabilityComputeQueryService : IAvailabilityComputeQueryS
         var rows = await _dbContext.RuleResources
             .AsNoTracking()
             .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link => link.Rule.IsActive)
             .Where(link =>
                 (link.Rule.SingleDateUtc != null && link.Rule.SingleDateUtc >= fromDateUtc && link.Rule.SingleDateUtc <= toDateUtc) ||
                 (link.Rule.FromDateUtc != null && link.Rule.ToDateUtc != null && link.Rule.FromDateUtc <= toDateUtc && link.Rule.ToDateUtc >= fromDateUtc) ||
