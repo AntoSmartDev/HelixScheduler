@@ -3,6 +3,7 @@ using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.BusyEventManagement;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Hierarchy;
+using HelixScheduler.Application.ManagementValidation;
 using HelixScheduler.Application.PropertyManagement;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
@@ -24,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBusyEventManagementService, BusyEventManagementService>();
         services.AddScoped<IDemoReadService, DemoReadService>();
         services.AddScoped<IHierarchyManagementService, HierarchyManagementService>();
+        services.AddScoped<IManagementValidationService, ManagementValidationService>();
         services.AddScoped<IPropertyManagementService, PropertyManagementService>();
         services.AddScoped<IResourcePropertyAssignmentManagementService, ResourcePropertyAssignmentManagementService>();
         services.AddScoped<IResourceCatalogService, ResourceCatalogService>();
