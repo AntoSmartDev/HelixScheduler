@@ -21,6 +21,11 @@ public sealed class TenantsConfiguration : IEntityTypeConfiguration<Tenants>
         builder.Property(tenant => tenant.Label)
             .HasMaxLength(128);
 
+        builder.Property(tenant => tenant.IsActive)
+            .HasColumnType("bit")
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(tenant => tenant.CreatedAtUtc)
             .HasColumnType("datetime2")
             .IsRequired();

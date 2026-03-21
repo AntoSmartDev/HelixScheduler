@@ -6,7 +6,6 @@ namespace HelixScheduler.Infrastructure.Persistence.Stores;
 
 public sealed class TenantStore : ITenantStore
 {
-    public const string DefaultTenantKey = "default";
     private readonly SchedulerDbContext _dbContext;
 
     public TenantStore(SchedulerDbContext dbContext)
@@ -23,31 +22,41 @@ public sealed class TenantStore : ITenantStore
 
         var tenant = await _dbContext.Tenants
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Key == key, ct)
+            .FirstOrDefaultAsync(item => item.Key == key && item.IsActive, ct)
             .ConfigureAwait(false);
 
-        return tenant == null ? null : new TenantInfo(tenant.Id, tenant.Key, tenant.Label);
+        return tenant == null ? null : new TenantInfo(tenant.Id, tenant.Key, tenant.Label, tenant.IsActive);
     }
 
     public async Task<TenantInfo> EnsureDefaultAsync(CancellationToken ct)
     {
-        var existing = await FindByKeyAsync(DefaultTenantKey, ct).ConfigureAwait(false);
+        var existing = await _dbContext.Tenants
+            .FirstOrDefaultAsync(item => item.Key == TenantConstants.DefaultTenantKey, ct)
+            .ConfigureAwait(false);
+
         if (existing != null)
         {
-            return existing;
+            if (!existing.IsActive)
+            {
+                existing.IsActive = true;
+                await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
+            return new TenantInfo(existing.Id, existing.Key, existing.Label, existing.IsActive);
         }
 
         var tenant = new Tenants
         {
             Id = Guid.NewGuid(),
-            Key = DefaultTenantKey,
+            Key = TenantConstants.DefaultTenantKey,
             Label = "Default",
+            IsActive = true,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         _dbContext.Tenants.Add(tenant);
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return new TenantInfo(tenant.Id, tenant.Key, tenant.Label);
+        return new TenantInfo(tenant.Id, tenant.Key, tenant.Label, tenant.IsActive);
     }
 }

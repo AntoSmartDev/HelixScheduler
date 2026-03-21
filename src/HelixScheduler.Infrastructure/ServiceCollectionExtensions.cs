@@ -5,6 +5,7 @@ using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Diagnostics;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
+using HelixScheduler.Application.Tenancy;
 using HelixScheduler.Application.Startup;
 using HelixScheduler.Infrastructure.Diagnostics;
 using HelixScheduler.Infrastructure.Persistence;
@@ -38,6 +39,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ITenantStore, TenantStore>();
+        services.AddScoped<ITenantManagementStore, TenantManagementStore>();
         services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
         services.AddScoped<ITenantBootstrapper, TenantBootstrapper>();
         services.AddScoped<IDemoSeedInitializer, DemoSeedInitializer>();

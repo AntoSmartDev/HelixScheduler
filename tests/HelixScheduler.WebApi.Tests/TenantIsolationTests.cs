@@ -126,6 +126,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
                 Id = defaultTenantId,
                 Key = "default",
                 Label = "Default",
+                IsActive = true,
                 CreatedAtUtc = now
             },
             new Tenants
@@ -133,6 +134,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
                 Id = tenantBId,
                 Key = "tenant-b",
                 Label = "Tenant B",
+                IsActive = true,
                 CreatedAtUtc = now
             });
 

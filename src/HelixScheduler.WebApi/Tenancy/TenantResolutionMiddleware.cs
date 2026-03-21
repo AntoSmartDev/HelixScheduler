@@ -1,7 +1,6 @@
 using System.Net.Mime;
 using System.Text.Json;
 using HelixScheduler.Application.Abstractions;
-using HelixScheduler.Infrastructure.Persistence.Stores;
 
 namespace HelixScheduler.WebApi.Tenancy;
 
@@ -20,7 +19,7 @@ public sealed class TenantResolutionMiddleware
     {
         var tenantKey = ResolveTenantKey(context.Request);
         TenantInfo? tenant;
-        if (string.IsNullOrWhiteSpace(tenantKey) || tenantKey == TenantStore.DefaultTenantKey)
+        if (string.IsNullOrWhiteSpace(tenantKey) || tenantKey == TenantConstants.DefaultTenantKey)
         {
             tenant = await tenantStore.EnsureDefaultAsync(context.RequestAborted).ConfigureAwait(false);
         }

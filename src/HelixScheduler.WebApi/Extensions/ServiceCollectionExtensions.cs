@@ -3,6 +3,7 @@ using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
+using HelixScheduler.Application.Tenancy;
 using HelixScheduler.Core;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IResourceCatalogService, ResourceCatalogService>();
         services.AddScoped<IResourceTypeCatalogService, ResourceTypeCatalogService>();
         services.AddScoped<IPropertySchemaService, PropertySchemaService>();
+        services.AddScoped<ITenantManagementService, TenantManagementService>();
         return services;
     }
 }

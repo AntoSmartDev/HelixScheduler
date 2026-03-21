@@ -244,7 +244,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         private static readonly TenantInfo DefaultTenant = new(
             new Guid("11111111-1111-1111-1111-111111111111"),
             "default",
-            "Default");
+            "Default",
+            true);
 
         public Task<TenantInfo?> FindByKeyAsync(string key, CancellationToken ct)
         {
