@@ -5,9 +5,12 @@ public sealed record BusyEventDefinition(
     DateTime StartUtc,
     DateTime EndUtc,
     string? Title,
-    string? EventType);
+    string? EventType,
+    string? ExternalKey);
 
 public sealed record RegisterBusyEventCommand(BusyEventDefinition Definition);
+public sealed record RegisterBusyEventsCommand(IReadOnlyList<BusyEventDefinition> Definitions);
+public sealed record UpsertBusyEventByExternalKeyCommand(string ExternalKey, BusyEventDefinition Definition);
 
 public sealed record UpdateBusyEventCommand(
     long BusyEventId,
@@ -19,6 +22,7 @@ public sealed record BusyEventManagementDto(
     DateTime StartUtc,
     DateTime EndUtc,
     string? EventType,
+    string? ExternalKey,
     IReadOnlyList<int> ResourceIds,
     bool IsActive,
     DateTime CreatedAtUtc);

@@ -31,7 +31,8 @@ public sealed class BusyEventManagementServiceTests
                     new DateTime(2026, 3, 25, 8, 0, 0, DateTimeKind.Utc),
                     new DateTime(2026, 3, 25, 10, 0, 0, DateTimeKind.Utc),
                     "Surgery block",
-                    "Reservation")),
+                    "Reservation",
+                    null)),
                 CancellationToken.None);
         });
 
@@ -64,7 +65,8 @@ public sealed class BusyEventManagementServiceTests
                         new DateTime(2026, 3, 25, 11, 0, 0, DateTimeKind.Utc),
                         new DateTime(2026, 3, 25, 12, 0, 0, DateTimeKind.Utc),
                         "Updated busy",
-                        "Maintenance")),
+                        "Maintenance",
+                        null)),
                 CancellationToken.None);
         });
 
@@ -98,6 +100,7 @@ public sealed class BusyEventManagementServiceTests
                     new DateTime(2026, 3, 25, 10, 0, 0, DateTimeKind.Local),
                     new DateTime(2026, 3, 25, 9, 0, 0, DateTimeKind.Utc),
                     null,
+                    null,
                     null)),
                 CancellationToken.None);
         });
@@ -119,6 +122,7 @@ public sealed class BusyEventManagementServiceTests
                     new[] { 2 },
                     new DateTime(2026, 3, 25, 10, 0, 0, DateTimeKind.Utc),
                     new DateTime(2026, 3, 25, 11, 0, 0, DateTimeKind.Utc),
+                    null,
                     null,
                     null)),
                 CancellationToken.None);
@@ -144,7 +148,8 @@ public sealed class BusyEventManagementServiceTests
                     new DateTime(2026, 3, 26, 8, 0, 0, DateTimeKind.Utc),
                     new DateTime(2026, 3, 26, 9, 0, 0, DateTimeKind.Utc),
                     "Busy compute",
-                    "Occupied")),
+                    "Occupied",
+                    null)),
                 CancellationToken.None);
         });
 
@@ -178,11 +183,108 @@ public sealed class BusyEventManagementServiceTests
                 new DateTime(2026, 3, 25, 10, 0, 0, DateTimeKind.Utc),
                 new DateTime(2026, 3, 25, 11, 0, 0, DateTimeKind.Utc),
                 null,
+                null,
                 null)),
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal("tenant.context.unresolved", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Bulk_Register_And_Idempotent_Upsert_Work_For_External_Integrations()
+    {
+        await using var provider = BuildServiceProvider();
+        var tenant = await SeedResourcesAsync(provider);
+
+        var bulkCreated = await ExecuteForTenantAsync(provider, tenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IBusyEventManagementService>();
+            return await service.RegisterBusyEventsAsync(
+                new RegisterBusyEventsCommand(
+                [
+                    new BusyEventDefinition(
+                        new[] { 1 },
+                        new DateTime(2026, 3, 27, 8, 0, 0, DateTimeKind.Utc),
+                        new DateTime(2026, 3, 27, 9, 0, 0, DateTimeKind.Utc),
+                        "Bulk 1",
+                        "Sync",
+                        "ext-1"),
+                    new BusyEventDefinition(
+                        new[] { 1, 2 },
+                        new DateTime(2026, 3, 27, 9, 0, 0, DateTimeKind.Utc),
+                        new DateTime(2026, 3, 27, 10, 0, 0, DateTimeKind.Utc),
+                        "Bulk 2",
+                        "Sync",
+                        "ext-2")
+                ]),
+                CancellationToken.None);
+        });
+
+        Assert.True(bulkCreated.Succeeded);
+        Assert.Equal(2, bulkCreated.Value!.Count);
+
+        var duplicateKey = await ExecuteForTenantAsync(provider, tenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IBusyEventManagementService>();
+            return await service.RegisterBusyEventAsync(
+                new RegisterBusyEventCommand(new BusyEventDefinition(
+                    new[] { 2 },
+                    new DateTime(2026, 3, 28, 8, 0, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 3, 28, 9, 0, 0, DateTimeKind.Utc),
+                    "Duplicate",
+                    "Sync",
+                    "ext-1")),
+                CancellationToken.None);
+        });
+
+        Assert.False(duplicateKey.Succeeded);
+        Assert.Equal("busy-event.external-key.duplicate", duplicateKey.Errors[0].Code);
+
+        var upsertCreated = await ExecuteForTenantAsync(provider, tenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IBusyEventManagementService>();
+            return await service.UpsertBusyEventByExternalKeyAsync(
+                new UpsertBusyEventByExternalKeyCommand(
+                    "ext-upsert",
+                    new BusyEventDefinition(
+                        new[] { 1 },
+                        new DateTime(2026, 3, 29, 10, 0, 0, DateTimeKind.Utc),
+                        new DateTime(2026, 3, 29, 11, 0, 0, DateTimeKind.Utc),
+                        "Upsert create",
+                        "Sync",
+                        null)),
+                CancellationToken.None);
+        });
+
+        Assert.True(upsertCreated.Succeeded);
+        Assert.Equal("ext-upsert", upsertCreated.Value!.ExternalKey);
+
+        var upsertUpdated = await ExecuteForTenantAsync(provider, tenant, async sp =>
+        {
+            var service = sp.GetRequiredService<IBusyEventManagementService>();
+            return await service.UpsertBusyEventByExternalKeyAsync(
+                new UpsertBusyEventByExternalKeyCommand(
+                    "ext-upsert",
+                    new BusyEventDefinition(
+                        new[] { 2 },
+                        new DateTime(2026, 3, 29, 12, 0, 0, DateTimeKind.Utc),
+                        new DateTime(2026, 3, 29, 13, 0, 0, DateTimeKind.Utc),
+                        "Upsert update",
+                        "Sync",
+                        null)),
+                CancellationToken.None);
+        });
+
+        Assert.True(upsertUpdated.Succeeded);
+        Assert.Equal(upsertCreated.Value.Id, upsertUpdated.Value!.Id);
+        Assert.Equal("Upsert update", upsertUpdated.Value.Title);
+        Assert.Equal(new[] { 2 }, upsertUpdated.Value.ResourceIds);
+
+        var listed = await ExecuteForTenantAsync(provider, tenant, sp =>
+            sp.GetRequiredService<IBusyEventManagementService>().ListBusyEventsAsync(CancellationToken.None));
+
+        Assert.Equal(3, listed.Count);
     }
 
     private static ServiceProvider BuildServiceProvider()

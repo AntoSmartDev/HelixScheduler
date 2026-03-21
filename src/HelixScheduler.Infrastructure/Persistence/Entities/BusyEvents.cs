@@ -8,6 +8,7 @@ public sealed class BusyEvents
     public DateTime StartUtc { get; set; }
     public DateTime EndUtc { get; set; }
     public string? EventType { get; set; }
+    public string? ExternalKey { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; }
 

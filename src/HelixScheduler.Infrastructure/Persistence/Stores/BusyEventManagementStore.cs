@@ -24,6 +24,17 @@ public sealed class BusyEventManagementStore : IBusyEventManagementStore
         return entity == null ? null : Map(entity);
     }
 
+    public async Task<BusyEventManagementDto?> FindByExternalKeyAsync(string externalKey, CancellationToken ct)
+    {
+        var entity = await _dbContext.BusyEvents
+            .AsNoTracking()
+            .Include(busyEvent => busyEvent.BusyEventResources)
+            .FirstOrDefaultAsync(busyEvent => busyEvent.ExternalKey == externalKey, ct)
+            .ConfigureAwait(false);
+
+        return entity == null ? null : Map(entity);
+    }
+
     public async Task<IReadOnlyList<BusyEventManagementDto>> ListAsync(CancellationToken ct)
     {
         var entities = await _dbContext.BusyEvents
@@ -50,6 +61,7 @@ public sealed class BusyEventManagementStore : IBusyEventManagementStore
             StartUtc = definition.StartUtc,
             EndUtc = definition.EndUtc,
             EventType = definition.EventType,
+            ExternalKey = definition.ExternalKey,
             IsActive = true,
             CreatedAtUtc = createdAtUtc
         };
@@ -68,6 +80,46 @@ public sealed class BusyEventManagementStore : IBusyEventManagementStore
         return Map(entity);
     }
 
+    public async Task<IReadOnlyList<BusyEventManagementDto>> CreateManyAsync(
+        Guid tenantId,
+        IReadOnlyList<BusyEventDefinition> definitions,
+        DateTime createdAtUtc,
+        CancellationToken ct)
+    {
+        var entities = new List<BusyEvents>(definitions.Count);
+
+        for (var i = 0; i < definitions.Count; i++)
+        {
+            var definition = definitions[i];
+            var entity = new BusyEvents
+            {
+                TenantId = tenantId,
+                Title = definition.Title,
+                StartUtc = definition.StartUtc,
+                EndUtc = definition.EndUtc,
+                EventType = definition.EventType,
+                ExternalKey = definition.ExternalKey,
+                IsActive = true,
+                CreatedAtUtc = createdAtUtc
+            };
+
+            for (var j = 0; j < definition.ResourceIds.Count; j++)
+            {
+                entity.BusyEventResources.Add(new BusyEventResources
+                {
+                    TenantId = tenantId,
+                    ResourceId = definition.ResourceIds[j]
+                });
+            }
+
+            entities.Add(entity);
+        }
+
+        _dbContext.BusyEvents.AddRange(entities);
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        return entities.Select(Map).ToList();
+    }
+
     public async Task<BusyEventManagementDto> UpdateAsync(long busyEventId, BusyEventDefinition definition, CancellationToken ct)
     {
         var entity = await _dbContext.BusyEvents
@@ -79,6 +131,8 @@ public sealed class BusyEventManagementStore : IBusyEventManagementStore
         entity.StartUtc = definition.StartUtc;
         entity.EndUtc = definition.EndUtc;
         entity.EventType = definition.EventType;
+        entity.ExternalKey = definition.ExternalKey;
+        entity.IsActive = true;
 
         var existingResourceIds = entity.BusyEventResources.Select(link => link.ResourceId).ToHashSet();
         var targetResourceIds = definition.ResourceIds.ToHashSet();
@@ -128,6 +182,7 @@ public sealed class BusyEventManagementStore : IBusyEventManagementStore
             DateTime.SpecifyKind(entity.StartUtc, DateTimeKind.Utc),
             DateTime.SpecifyKind(entity.EndUtc, DateTimeKind.Utc),
             entity.EventType,
+            entity.ExternalKey,
             entity.BusyEventResources.Select(link => link.ResourceId).OrderBy(id => id).ToList(),
             entity.IsActive,
             entity.CreatedAtUtc);

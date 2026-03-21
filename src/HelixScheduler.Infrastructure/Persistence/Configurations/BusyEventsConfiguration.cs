@@ -33,6 +33,9 @@ public sealed class BusyEventsConfiguration : IEntityTypeConfiguration<BusyEvent
         builder.Property(busyEvent => busyEvent.EventType)
             .HasMaxLength(50);
 
+        builder.Property(busyEvent => busyEvent.ExternalKey)
+            .HasMaxLength(200);
+
         builder.Property(busyEvent => busyEvent.IsActive)
             .HasDefaultValue(true)
             .IsRequired();
@@ -47,5 +50,8 @@ public sealed class BusyEventsConfiguration : IEntityTypeConfiguration<BusyEvent
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(busyEvent => new { busyEvent.TenantId, busyEvent.StartUtc, busyEvent.EndUtc });
+        builder.HasIndex(busyEvent => new { busyEvent.TenantId, busyEvent.ExternalKey })
+            .IsUnique()
+            .HasFilter("[ExternalKey] IS NOT NULL");
     }
 }
