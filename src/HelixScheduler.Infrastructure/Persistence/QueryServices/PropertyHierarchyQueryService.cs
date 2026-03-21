@@ -30,6 +30,7 @@ public sealed class PropertyHierarchyQueryService
 
             var nodes = await _dbContext.ResourceProperties
                 .AsNoTracking()
+                .Where(property => property.IsActive)
                 .Where(property => batch.Contains(property.Id) || (property.ParentId != null && batch.Contains(property.ParentId.Value)))
                 .Select(property => new PropertyNode(
                     property.Id,

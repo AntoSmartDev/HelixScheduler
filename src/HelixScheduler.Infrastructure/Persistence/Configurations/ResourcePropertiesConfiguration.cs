@@ -27,6 +27,10 @@ public sealed class ResourcePropertiesConfiguration : IEntityTypeConfiguration<R
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(property => property.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.HasOne<Tenants>()
             .WithMany()
             .HasForeignKey(property => property.TenantId)

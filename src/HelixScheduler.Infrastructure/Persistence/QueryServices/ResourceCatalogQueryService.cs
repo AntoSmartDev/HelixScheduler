@@ -43,6 +43,7 @@ public sealed class ResourceCatalogQueryService : IResourceCatalogQueryService
     {
         return await _dbContext.ResourceProperties
             .AsNoTracking()
+            .Where(property => property.IsActive)
             .OrderBy(property => property.Key)
             .ThenBy(property => property.SortOrder)
             .ThenBy(property => property.Label)
@@ -67,7 +68,7 @@ public sealed class ResourceCatalogQueryService : IResourceCatalogQueryService
 
         return await _dbContext.ResourcePropertyLinks
             .AsNoTracking()
-            .Where(link => resourceIds.Contains(link.ResourceId))
+            .Where(link => resourceIds.Contains(link.ResourceId) && link.Property.IsActive)
             .Select(link => new ResourcePropertyLink(
                 link.ResourceId,
                 link.PropertyId))

@@ -16,6 +16,7 @@ public sealed class PropertySchemaQueryService : IPropertySchemaQueryService
     {
         return await _dbContext.ResourceProperties
             .AsNoTracking()
+            .Where(property => property.IsActive)
             .OrderBy(property => property.Key)
             .ThenBy(property => property.SortOrder)
             .ThenBy(property => property.Label)
@@ -33,6 +34,7 @@ public sealed class PropertySchemaQueryService : IPropertySchemaQueryService
     {
         return await _dbContext.ResourceTypeProperties
             .AsNoTracking()
+            .Where(link => link.ResourceType.IsActive && link.PropertyDefinition.IsActive)
             .Select(link => new ResourceTypePropertyLink(
                 link.ResourceTypeId,
                 link.PropertyDefinitionId))

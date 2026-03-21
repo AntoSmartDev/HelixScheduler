@@ -4,6 +4,7 @@ using HelixScheduler.Application.Availability.QueryServices;
 using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Diagnostics;
 using HelixScheduler.Application.PropertySchema;
+using HelixScheduler.Application.PropertyManagement;
 using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Application.ResourceCatalog.Management;
 using HelixScheduler.Application.Hierarchy;
@@ -43,6 +44,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<ITenantManagementStore, TenantManagementStore>();
         services.AddScoped<IHierarchyManagementStore, HierarchyManagementStore>();
+        services.AddScoped<IPropertyManagementStore, PropertyManagementStore>();
+        services.AddScoped<IResourcePropertyAssignmentManagementStore, ResourcePropertyAssignmentManagementStore>();
         services.AddScoped<IResourceTypeManagementStore, ResourceTypeManagementStore>();
         services.AddScoped<IResourceManagementStore, ResourceManagementStore>();
         services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
