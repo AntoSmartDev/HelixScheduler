@@ -44,6 +44,39 @@ public sealed record BusyEventResourceBindingSnapshot(
     int ResourceId,
     bool BusyEventIsActive);
 
+public sealed record InactiveResourcePropertyAssignmentReference(
+    int ResourceId,
+    int PropertyId);
+
+public sealed record InactiveResourceTypePropertyMappingReference(
+    int ResourceTypeId,
+    int PropertyId);
+
+public sealed record LegacyPropertyReferenceSnapshot(
+    IReadOnlyList<InactiveResourcePropertyAssignmentReference> InactiveResourcePropertyAssignments,
+    IReadOnlyList<InactiveResourceTypePropertyMappingReference> InactiveResourceTypePropertyMappings);
+
+public sealed record LegacyPropertyReferenceCleanupResult(
+    int RemovedResourcePropertyAssignments,
+    int RemovedResourceTypePropertyMappings);
+
+public sealed record LegacyConsistencyRepairPreview(
+    IReadOnlyList<InactiveResourcePropertyAssignmentReference> InactiveResourcePropertyAssignments,
+    IReadOnlyList<InactiveResourceTypePropertyMappingReference> InactiveResourceTypePropertyMappings)
+{
+    public int TotalRepairableItems =>
+        InactiveResourcePropertyAssignments.Count + InactiveResourceTypePropertyMappings.Count;
+}
+
+public sealed record LegacyConsistencyReport(
+    ManagementValidationResult Validation,
+    LegacyConsistencyRepairPreview RepairPreview);
+
+public sealed record LegacyConsistencyCleanupResult(
+    int RemovedResourcePropertyAssignments,
+    int RemovedResourceTypePropertyMappings,
+    LegacyConsistencyReport ReportAfter);
+
 public sealed record TenantValidationSnapshot(
     IReadOnlyList<ResourceValidationSnapshot> Resources,
     IReadOnlyList<ResourceTypeValidationSnapshot> ResourceTypes,

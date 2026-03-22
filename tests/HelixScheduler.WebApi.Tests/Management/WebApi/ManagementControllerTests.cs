@@ -76,6 +76,15 @@ public sealed class ManagementControllerTests
             Assert.True(validation.RootElement.GetProperty("isValid").GetBoolean());
         }
 
+        var legacyReportResponse = await client.GetAsync("/api/management/validation/legacy");
+        legacyReportResponse.EnsureSuccessStatusCode();
+        using (var legacyReportStream = await legacyReportResponse.Content.ReadAsStreamAsync())
+        {
+            var legacyReport = await JsonDocument.ParseAsync(legacyReportStream);
+            Assert.True(legacyReport.RootElement.GetProperty("validation").GetProperty("isValid").GetBoolean());
+            Assert.Equal(0, legacyReport.RootElement.GetProperty("repairPreview").GetProperty("totalRepairableItems").GetInt32());
+        }
+
         var resourceConfigurationResponse = await client.PostAsJsonAsync("/api/management/catalog/resource-configuration", new
         {
             resourceId = childResourceId,
@@ -251,6 +260,58 @@ public sealed class ManagementControllerTests
         Assert.Equal(1, removed.RootElement.GetProperty("propertyDefinitionIds").GetArrayLength());
     }
 
+    [Fact]
+    public async Task Legacy_Consistency_Endpoints_Report_And_Cleanup_Inactive_Property_References()
+    {
+        await using var factory = new ManagementWebApplicationFactory();
+        var client = factory.CreateClient();
+        var uniqueKey = $"legacy-{Guid.NewGuid():N}";
+
+        var resourceTypeId = await CreateResourceTypeAsync(client, uniqueKey, "Room", 1);
+        var resourceId = await CreateResourceAsync(client, "ROOM-L", "Legacy Room", resourceTypeId);
+        var propertyId = await CreatePropertyAsync(client, "LegacyProperty", "Legacy Property", 1);
+
+        var assignTypeResponse = await client.PostAsJsonAsync("/api/management/resource-types/property-definitions/assign", new
+        {
+            resourceTypeId,
+            propertyDefinitionIds = new[] { propertyId }
+        });
+        assignTypeResponse.EnsureSuccessStatusCode();
+
+        var assignResourceResponse = await client.PostAsJsonAsync("/api/management/resource-property-assignments/assign", new
+        {
+            resourceId,
+            propertyIds = new[] { propertyId }
+        });
+        assignResourceResponse.EnsureSuccessStatusCode();
+
+        var deactivatePropertyResponse = await client.PostAsync($"/api/management/properties/{propertyId}/deactivate", null);
+        Assert.Equal(HttpStatusCode.Conflict, deactivatePropertyResponse.StatusCode);
+
+        await ForceDeactivatePropertyAsync(factory, propertyId);
+
+        var reportResponse = await client.GetAsync("/api/management/validation/legacy");
+        reportResponse.EnsureSuccessStatusCode();
+
+        using (var reportStream = await reportResponse.Content.ReadAsStreamAsync())
+        {
+            var report = await JsonDocument.ParseAsync(reportStream);
+            Assert.False(report.RootElement.GetProperty("validation").GetProperty("isValid").GetBoolean());
+            Assert.Equal(2, report.RootElement.GetProperty("repairPreview").GetProperty("totalRepairableItems").GetInt32());
+        }
+
+        var cleanupResponse = await client.PostAsync("/api/management/validation/legacy/cleanup-inactive-property-references", null);
+        cleanupResponse.EnsureSuccessStatusCode();
+
+        using (var cleanupStream = await cleanupResponse.Content.ReadAsStreamAsync())
+        {
+            var cleanup = await JsonDocument.ParseAsync(cleanupStream);
+            Assert.Equal(1, cleanup.RootElement.GetProperty("removedResourcePropertyAssignments").GetInt32());
+            Assert.Equal(1, cleanup.RootElement.GetProperty("removedResourceTypePropertyMappings").GetInt32());
+            Assert.Equal(0, cleanup.RootElement.GetProperty("reportAfter").GetProperty("repairPreview").GetProperty("totalRepairableItems").GetInt32());
+        }
+    }
+
     private static async Task<int> CreateResourceTypeAsync(HttpClient client, string key, string label, int sortOrder)
     {
         var response = await client.PostAsJsonAsync("/api/management/resource-types", new { key, label, sortOrder });
@@ -314,6 +375,15 @@ public sealed class ManagementControllerTests
             }
         });
         response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task ForceDeactivatePropertyAsync(ManagementWebApplicationFactory factory, int propertyId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SchedulerDbContext>();
+        var property = await dbContext.ResourceProperties.IgnoreQueryFilters().FirstAsync(item => item.Id == propertyId);
+        property.IsActive = false;
+        await dbContext.SaveChangesAsync();
     }
 }
 

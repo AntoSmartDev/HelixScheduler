@@ -101,4 +101,58 @@ public sealed class ManagementValidationStore : IManagementValidationStore
             ruleBindings,
             busyBindings);
     }
+
+    public async Task<LegacyPropertyReferenceSnapshot> LoadInactivePropertyReferenceSnapshotAsync(CancellationToken ct)
+    {
+        var inactiveAssignments = await _dbContext.ResourcePropertyLinks
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(link => link.TenantId == _tenantContext.TenantId && !link.Property.IsActive)
+            .Select(link => new InactiveResourcePropertyAssignmentReference(
+                link.ResourceId,
+                link.PropertyId))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var inactiveMappings = await _dbContext.ResourceTypeProperties
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(link => link.TenantId == _tenantContext.TenantId && !link.PropertyDefinition.IsActive)
+            .Select(link => new InactiveResourceTypePropertyMappingReference(
+                link.ResourceTypeId,
+                link.PropertyDefinitionId))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return new LegacyPropertyReferenceSnapshot(inactiveAssignments, inactiveMappings);
+    }
+
+    public async Task<LegacyPropertyReferenceCleanupResult> RemoveInactivePropertyReferencesAsync(CancellationToken ct)
+    {
+        var assignments = await _dbContext.ResourcePropertyLinks
+            .IgnoreQueryFilters()
+            .Where(link => link.TenantId == _tenantContext.TenantId && !link.Property.IsActive)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var mappings = await _dbContext.ResourceTypeProperties
+            .IgnoreQueryFilters()
+            .Where(link => link.TenantId == _tenantContext.TenantId && !link.PropertyDefinition.IsActive)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (assignments.Count > 0)
+        {
+            _dbContext.ResourcePropertyLinks.RemoveRange(assignments);
+        }
+
+        if (mappings.Count > 0)
+        {
+            _dbContext.ResourceTypeProperties.RemoveRange(mappings);
+        }
+
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new LegacyPropertyReferenceCleanupResult(assignments.Count, mappings.Count);
+    }
 }

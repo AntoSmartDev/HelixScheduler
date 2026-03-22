@@ -10,13 +10,16 @@ namespace HelixScheduler.WebApi.Controllers;
 public sealed class ManagementCatalogReadController : ManagementControllerBase
 {
     private readonly IManagementCatalogReadService _catalogReadService;
+    private readonly ILegacyConsistencyService _legacyConsistencyService;
     private readonly IManagementValidationService _validationService;
 
     public ManagementCatalogReadController(
         IManagementCatalogReadService catalogReadService,
+        ILegacyConsistencyService legacyConsistencyService,
         IManagementValidationService validationService)
     {
         _catalogReadService = catalogReadService;
+        _legacyConsistencyService = legacyConsistencyService;
         _validationService = validationService;
     }
 
@@ -46,5 +49,17 @@ public sealed class ManagementCatalogReadController : ManagementControllerBase
         CancellationToken ct = default)
     {
         return _validationService.ValidateResourceConfigurationAsync(resourceId, ct);
+    }
+
+    [HttpGet("validation/legacy")]
+    public async Task<ActionResult<LegacyConsistencyReport>> GetLegacyConsistencyReportAsync(CancellationToken ct = default)
+    {
+        return FromManagementResult(await _legacyConsistencyService.GetLegacyConsistencyReportAsync(ct));
+    }
+
+    [HttpPost("validation/legacy/cleanup-inactive-property-references")]
+    public async Task<ActionResult<LegacyConsistencyCleanupResult>> CleanupInactivePropertyReferencesAsync(CancellationToken ct = default)
+    {
+        return FromManagementResult(await _legacyConsistencyService.CleanupInactivePropertyReferencesAsync(ct));
     }
 }

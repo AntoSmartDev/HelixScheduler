@@ -30,6 +30,7 @@ public sealed class ManagementValidationServiceTests
         Assert.Contains(result.Findings, finding => finding.Code == "validation.resource.type-inactive");
         Assert.Contains(result.Findings, finding => finding.Code == "validation.hierarchy.cycle-detected");
         Assert.Contains(result.Findings, finding => finding.Code == "validation.property.active-child-inactive-parent");
+        Assert.Contains(result.Findings, finding => finding.Code == "validation.resource-type.mapping-property-inactive");
         Assert.Contains(result.Findings, finding => finding.Code == "validation.rule.resource-inactive");
         Assert.Contains(result.Findings, finding => finding.Code == "validation.busy-event.resource-inactive");
         Assert.Contains(result.Findings, finding => finding.Code == "validation.resource.property-type-incompatibility");
@@ -171,6 +172,13 @@ public sealed class ManagementValidationServiceTests
             TenantId = tenantId,
             ResourceTypeId = 1,
             PropertyDefinitionId = 100
+        });
+
+        dbContext.ResourceTypeProperties.Add(new ResourceTypeProperties
+        {
+            TenantId = tenantId,
+            ResourceTypeId = 1,
+            PropertyDefinitionId = 200
         });
 
         dbContext.ResourcePropertyLinks.AddRange(

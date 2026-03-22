@@ -35,6 +35,7 @@ public sealed class ManagementValidationService : IManagementValidationService
         ValidateResources(snapshot, findings);
         ValidateResourceRelations(snapshot, findings);
         ValidateProperties(snapshot, findings);
+        ValidateResourceTypePropertyMappings(snapshot, findings);
         ValidateRuleBindings(snapshot, findings);
         ValidateBusyBindings(snapshot, findings);
         await ValidatePropertyAssignmentsCompatibilityAsync(snapshot, findings, ct).ConfigureAwait(false);
@@ -246,6 +247,32 @@ public sealed class ManagementValidationService : IManagementValidationService
             if (!resource.IsActive || resource.IsArchived)
             {
                 findings.Add(CreateError("validation.rule.resource-inactive", ManagementErrorCategory.InvalidOperation, $"Active rule '{binding.RuleId}' references inactive or archived resource '{binding.ResourceId}'.", "rules"));
+            }
+        }
+    }
+
+    private static void ValidateResourceTypePropertyMappings(TenantValidationSnapshot snapshot, List<ManagementError> findings)
+    {
+        for (var i = 0; i < snapshot.ResourceTypePropertyMappings.Count; i++)
+        {
+            var mapping = snapshot.ResourceTypePropertyMappings[i];
+            var resourceType = snapshot.ResourceTypes.FirstOrDefault(item => item.Id == mapping.ResourceTypeId);
+            if (resourceType == null)
+            {
+                findings.Add(CreateError("validation.resource-type.mapping-type-missing", ManagementErrorCategory.NotFound, $"Resource type mapping references missing resource type '{mapping.ResourceTypeId}'.", "resourceTypeProperties"));
+                continue;
+            }
+
+            var property = snapshot.Properties.FirstOrDefault(item => item.Id == mapping.PropertyId);
+            if (property == null)
+            {
+                findings.Add(CreateError("validation.resource-type.mapping-property-missing", ManagementErrorCategory.NotFound, $"Resource type '{mapping.ResourceTypeId}' references missing property '{mapping.PropertyId}'.", "resourceTypeProperties"));
+                continue;
+            }
+
+            if (!property.IsActive)
+            {
+                findings.Add(CreateError("validation.resource-type.mapping-property-inactive", ManagementErrorCategory.InvalidOperation, $"Resource type '{mapping.ResourceTypeId}' references inactive property '{mapping.PropertyId}'.", "resourceTypeProperties"));
             }
         }
     }

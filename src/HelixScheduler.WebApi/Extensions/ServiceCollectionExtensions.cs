@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IManagementCatalogReadService, ManagementCatalogReadService>();
         services.AddScoped<IDemoReadService, DemoReadService>();
         services.AddScoped<IHierarchyManagementService, HierarchyManagementService>();
+        services.AddScoped<ILegacyConsistencyService, LegacyConsistencyService>();
         services.AddScoped<IManagementValidationService, ManagementValidationService>();
         services.AddScoped<IPropertyManagementService, PropertyManagementService>();
         services.AddScoped<IResourcePropertyAssignmentManagementService, ResourcePropertyAssignmentManagementService>();
