@@ -1,16 +1,16 @@
 using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability.Orchestration;
-using HelixScheduler.Application.BusyEventManagement;
-using HelixScheduler.Application.CatalogRead;
+using HelixScheduler.Application.Management.BusyEvents;
+using HelixScheduler.Application.Management.CatalogRead;
 using HelixScheduler.Application.Demo;
-using HelixScheduler.Application.Hierarchy;
-using HelixScheduler.Application.ManagementValidation;
-using HelixScheduler.Application.PropertyManagement;
+using HelixScheduler.Application.Management.Hierarchy;
+using HelixScheduler.Application.Management.Properties;
+using HelixScheduler.Application.Management.Validation;
 using HelixScheduler.Application.PropertySchema;
 using HelixScheduler.Application.ResourceCatalog;
-using HelixScheduler.Application.ResourceCatalog.Management;
-using HelixScheduler.Application.RuleManagement;
-using HelixScheduler.Application.Tenancy;
+using HelixScheduler.Application.Management.ResourceCatalog;
+using HelixScheduler.Application.Management.Rules;
+using HelixScheduler.Application.Management.Tenants;
 using HelixScheduler.Core;
 using Microsoft.Extensions.DependencyInjection;
 
