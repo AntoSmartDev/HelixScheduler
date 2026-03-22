@@ -207,6 +207,48 @@ public sealed class ManagementControllerTests
     }
 
     [Fact]
+    public async Task Busy_Event_Bulk_Endpoint_Maps_Duplicate_External_Key_In_Batch_As_BadRequest()
+    {
+        await using var factory = new ManagementWebApplicationFactory();
+        var client = factory.CreateClient();
+        var uniqueKey = $"room-{Guid.NewGuid():N}";
+
+        var resourceTypeId = await CreateResourceTypeAsync(client, uniqueKey, "Room", 1);
+        var resourceId = await CreateResourceAsync(client, "ROOM-A", "Room A", resourceTypeId);
+
+        var response = await client.PostAsJsonAsync("/api/management/busy-events/bulk", new
+        {
+            definitions = new object[]
+            {
+                new
+                {
+                    resourceIds = new[] { resourceId },
+                    startUtc = "2026-03-27T08:00:00Z",
+                    endUtc = "2026-03-27T09:00:00Z",
+                    title = "Bulk 1",
+                    eventType = "Sync",
+                    externalKey = "dup-key"
+                },
+                new
+                {
+                    resourceIds = new[] { resourceId },
+                    startUtc = "2026-03-27T10:00:00Z",
+                    endUtc = "2026-03-27T11:00:00Z",
+                    title = "Bulk 2",
+                    eventType = "Sync",
+                    externalKey = "dup-key"
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        var doc = await JsonDocument.ParseAsync(stream);
+        Assert.Equal("busy-event.external-key.duplicate-in-batch", doc.RootElement.GetProperty("errors")[0].GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task ResourceType_PropertySchema_Endpoints_Work_EndToEnd()
     {
         await using var factory = new ManagementWebApplicationFactory();
@@ -258,6 +300,79 @@ public sealed class ManagementControllerTests
         using var removeStream = await removeResponse.Content.ReadAsStreamAsync();
         var removed = await JsonDocument.ParseAsync(removeStream);
         Assert.Equal(1, removed.RootElement.GetProperty("propertyDefinitionIds").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Resource_Property_Assignment_Endpoint_Maps_Type_Incompatibility_As_BadRequest()
+    {
+        await using var factory = new ManagementWebApplicationFactory();
+        var client = factory.CreateClient();
+        var uniqueKey = $"type-{Guid.NewGuid():N}";
+
+        var resourceTypeId = await CreateResourceTypeAsync(client, uniqueKey, "Room", 1);
+        var resourceId = await CreateResourceAsync(client, "ROOM-T", "Room Typed", resourceTypeId);
+        var propertyId = await CreatePropertyAsync(client, "UnmappedProperty", "Unmapped Property", 1);
+
+        var response = await client.PostAsJsonAsync("/api/management/resource-property-assignments/assign", new
+        {
+            resourceId,
+            propertyIds = new[] { propertyId }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var stream = await response.Content.ReadAsStreamAsync();
+        var doc = await JsonDocument.ParseAsync(stream);
+        Assert.Equal("property.assignment.type-incompatibility", doc.RootElement.GetProperty("errors")[0].GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Catalog_Snapshot_Filters_Archived_Resources_But_Resource_Configuration_Still_Shows_Legacy_Bindings()
+    {
+        await using var factory = new ManagementWebApplicationFactory();
+        var client = factory.CreateClient();
+        var uniqueKey = $"room-{Guid.NewGuid():N}";
+
+        var resourceTypeId = await CreateResourceTypeAsync(client, uniqueKey, "Room", 1);
+        var activeResourceId = await CreateResourceAsync(client, "ROOM-A", "Room A", resourceTypeId);
+        var archivedResourceId = await CreateResourceAsync(client, "ROOM-B", "Room B", resourceTypeId);
+
+        await CreateRuleAsync(client, archivedResourceId);
+        await CreateBusyEventAsync(client, archivedResourceId, "archived-busy");
+
+        var archiveResponse = await client.PostAsync($"/api/management/resources/{archivedResourceId}/archive", null);
+        archiveResponse.EnsureSuccessStatusCode();
+
+        var snapshotResponse = await client.GetAsync("/api/management/catalog/snapshot");
+        snapshotResponse.EnsureSuccessStatusCode();
+
+        using (var snapshotStream = await snapshotResponse.Content.ReadAsStreamAsync())
+        {
+            var snapshot = await JsonDocument.ParseAsync(snapshotStream);
+            var resourceIds = snapshot.RootElement
+                .GetProperty("resources")
+                .EnumerateArray()
+                .Select(item => item.GetProperty("id").GetInt32())
+                .ToArray();
+
+            Assert.Contains(activeResourceId, resourceIds);
+            Assert.DoesNotContain(archivedResourceId, resourceIds);
+        }
+
+        var resourceConfigurationResponse = await client.PostAsJsonAsync("/api/management/catalog/resource-configuration", new
+        {
+            resourceId = archivedResourceId,
+            fromDateUtc = "2026-03-01",
+            toDateUtc = "2026-03-31"
+        });
+        resourceConfigurationResponse.EnsureSuccessStatusCode();
+
+        using var resourceConfigurationStream = await resourceConfigurationResponse.Content.ReadAsStreamAsync();
+        var resourceConfiguration = await JsonDocument.ParseAsync(resourceConfigurationStream);
+        Assert.Equal(archivedResourceId, resourceConfiguration.RootElement.GetProperty("resource").GetProperty("id").GetInt32());
+        Assert.Equal(1, resourceConfiguration.RootElement.GetProperty("rules").GetArrayLength());
+        Assert.Equal(1, resourceConfiguration.RootElement.GetProperty("busyEvents").GetArrayLength());
+        Assert.False(resourceConfiguration.RootElement.GetProperty("validation").GetProperty("isValid").GetBoolean());
     }
 
     [Fact]
@@ -372,6 +487,23 @@ public sealed class ManagementControllerTests
                 daysOfWeekMask = (int?)null,
                 dayOfMonth = (int?)null,
                 intervalDays = (int?)null
+            }
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task CreateBusyEventAsync(HttpClient client, int resourceId, string externalKey)
+    {
+        var response = await client.PostAsJsonAsync("/api/management/busy-events", new
+        {
+            definition = new
+            {
+                resourceIds = new[] { resourceId },
+                startUtc = "2026-03-25T12:00:00Z",
+                endUtc = "2026-03-25T13:00:00Z",
+                title = "Busy",
+                eventType = "Sync",
+                externalKey
             }
         });
         response.EnsureSuccessStatusCode();
