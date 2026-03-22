@@ -15,7 +15,10 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    HelixScheduler.WebApi.Management.ManagementOpenApiConfiguration.Configure(options);
+});
 builder.Services.AddHelixSchedulerInfrastructure(builder.Configuration);
 builder.Services.AddHelixSchedulerWebApi();
 
