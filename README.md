@@ -481,7 +481,7 @@ Example `appsettings.json`:
 ### 1. Apply database migrations (create/update the database schema)
 
 ```bash
-dotnet ef database update --startup-project src/HelixScheduler.WebApi
+dotnet ef database update --project src/HelixScheduler.Infrastructure --startup-project src/HelixScheduler.WebApi
 ```
 
 This command creates or updates the database schema using EF Core migrations.
