@@ -23,9 +23,10 @@ builder.Services.AddHelixSchedulerInfrastructure(builder.Configuration);
 builder.Services.AddHelixSchedulerWebApi();
 
 var app = builder.Build();
+var exposeOpenApi = app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("OpenApi:Expose");
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (exposeOpenApi)
 {
     app.MapOpenApi();
 }
@@ -58,7 +59,7 @@ app.MapGet("/", () =>
           <h1>HelixScheduler WebApi</h1>
           <p>Service is running.</p>
           <ul>
-            <li><a href="/openapi/v1.json">OpenAPI JSON</a></li>
+            <li><a href="/openapi/v1.json">OpenAPI JSON (when enabled)</a></li>
             <li><a href="/health">Health</a></li>
           </ul>
         </body>

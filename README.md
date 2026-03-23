@@ -464,6 +464,26 @@ The engine can be used:
 - .NET 10 SDK
 - SQL Server (current runtime database)
 
+## Management Layer
+
+HelixScheduler exposes two official product surfaces:
+
+- compute layer
+- management layer
+
+The compute layer answers availability questions.
+The management layer governs the scheduler model that the compute layer consumes.
+
+Management documentation:
+
+- [Management Overview](docs/management/overview.md)
+- [Management Quickstart](docs/management/quickstart.md)
+- [Management WebApi](docs/management/webapi.md)
+- [Management Examples](docs/management/examples.md)
+
+OpenAPI is available at `/openapi/v1.json` when enabled. By default it is exposed in
+`Development`; in other environments set `OpenApi:Expose=true`.
+
 ## Database Setup
 The current runtime setup uses SQL Server. Configure the connection string in `appsettings.json` or environment variables.
 
