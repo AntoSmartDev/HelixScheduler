@@ -254,7 +254,7 @@ Diagnostics
 → X-ray
 → CT
 
-With `includePropertyDescendants` you can filter by a category and automatically include all specializations.
+With `includePropertyDescendants` inside `propertyFilterGroups` or `ancestorFilters`, you can filter by a category and automatically include all specializations.
 
 Property filters can also be grouped to express richer structural constraints.
 
@@ -603,7 +603,7 @@ It uses only catalog endpoints:
 The Availability page allows you to:
 
 - select a time range (UTC)
-- set slot duration (`slotMinutes`)
+- set slot duration (`slotDurationMinutes`)
 - combine resources (AND / OR)
 - apply grouped property filters, including descendant-aware matching (`includePropertyDescendants`)
 - apply ancestor-aware constraints (`includeResourceAncestors`)
@@ -663,6 +663,10 @@ The project is designed to be integrated, extended, and maintained over time wit
 
 Apache-2.0. See [LICENSE](LICENSE).
 
+# Contributors
+
+HelixScheduler is actively maintained by **[Antonio Angiò](https://github.com/AntoSmartDev/)**.
+Contributions are welcome through pull requests.
 
 
 
