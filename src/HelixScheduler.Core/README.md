@@ -44,4 +44,48 @@ Use this package when you want to:
 - build your own adapters around the canonical engine
 - keep scheduling logic separate from application-specific workflows
 
-For solution-level guidance, see the repository README and `docs/` in the main repo.
+## Install
+
+```powershell
+dotnet add package HelixScheduler.Core
+```
+
+## Minimal Example
+
+```csharp
+using HelixScheduler.Core;
+
+var engine = new AvailabilityEngine();
+
+var query = new AvailabilityQuery(
+    period: new DatePeriod(
+        new DateOnly(2026, 3, 25),
+        new DateOnly(2026, 3, 25)),
+    requiredResourceIds: [1]);
+
+var rules = new List<AvailabilityRule>
+{
+    new(
+        id: 1,
+        kind: RuleKind.SingleDate,
+        isExclude: false,
+        fromDate: null,
+        toDate: null,
+        singleDate: new DateOnly(2026, 3, 25),
+        startTime: TimeSpan.FromHours(9),
+        endTime: TimeSpan.FromHours(17),
+        daysOfWeekMask: null,
+        dayOfMonth: null,
+        intervalDays: null,
+        resourceId: 1)
+};
+var busySlots = new List<BusySlot>();
+var inputs = new AvailabilityInputs(rules, busySlots);
+
+AvailabilityResult result = engine.Compute(query, inputs);
+```
+
+The exact rule and busy-slot shapes depend on the scheduling model you build on top of the core.
+
+For solution-level guidance, see the repository README. For additional core usage examples, see the
+`HelixScheduler.Core.Tests` project in the main repo.

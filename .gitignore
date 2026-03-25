@@ -27,6 +27,7 @@ TestResults/
 *.coveragexml
 
 # BenchmarkDotNet
+artifacts/
 BenchmarkDotNet.Artifacts/
 
 # Logs & local files
