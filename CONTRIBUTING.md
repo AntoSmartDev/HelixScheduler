@@ -21,9 +21,7 @@ We welcome bug fixes, performance improvements, and documentation updates. For n
 
 ## Database & migrations
 ```bash
- dotnet ef database update \
-   --project src/HelixScheduler.Infrastructure \
-   --startup-project src/HelixScheduler.WebApi
+ dotnet ef database update --project src/HelixScheduler.Infrastructure --startup-project src/HelixScheduler.WebApi
 ```
 
 ## Code style

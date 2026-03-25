@@ -254,7 +254,7 @@ Diagnostics
 → X-ray
 → CT
 
-With `includeDescendants` you can filter by a category and automatically include all specializations.
+With `includePropertyDescendants` you can filter by a category and automatically include all specializations.
 
 Property filters can also be grouped to express richer structural constraints.
 
@@ -532,7 +532,7 @@ On startup (in non-`Testing` environments), the WebApi executes the demo seed an
 Open a second terminal and run:
 
 ```bash
-dotnet run --project src/HelixScheduler.DemoWeb
+dotnet run --project samples/HelixScheduler.DemoWeb
 ```
 
 The DemoWeb project is a read-only UI that calls the WebApi and renders availability results.
@@ -556,54 +556,12 @@ If using Visual Studio:
 
 # API Examples
 
-### Compute availability (POST)
-```bash
-curl -X POST http://localhost:5000/api/availability/compute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "fromDate": "2026-01-05",
-    "toDate": "2026-01-05",
-    "requiredResourceIds": [1],
-    "slotDurationMinutes": 30,
-    "includeRemainderSlot": false
-  }'
-```
+For current HTTP examples, see [docs/api-examples.md](docs/api-examples.md).
 
-### Compute availability with tenant header
-```bash
-curl -X POST http://localhost:5000/api/availability/compute \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant: default" \
-  -d '{
-    "fromDate": "2026-01-05",
-    "toDate": "2026-01-05",
-    "requiredResourceIds": [1],
-    "slotDurationMinutes": 30,
-    "includeRemainderSlot": false
-  }'
-```
-
-### Compute with ancestors and OR groups
-```bash
-curl -X POST http://localhost:5000/api/availability/compute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "fromDate": "2026-01-05",
-    "toDate": "2026-01-05",
-    "requiredResourceIds": [1],
-    "resourceOrGroups": [[2,3],[10,11,12]],
-    "includeResourceAncestors": true,
-    "ancestorRelationTypes": ["Contains"],
-    "ancestorMode": "perGroup",
-    "slotDurationMinutes": 30,
-    "includeRemainderSlot": false
-  }'
-```
-
-### Get slots (query string)
-```bash
-curl "http://localhost:5000/api/availability/slots?fromDate=2026-01-05&toDate=2026-01-05&resourceIds=1"
-```
+Use `POST /api/availability/compute` for the full availability surface, including `propertyFilterGroups`, `ancestorFilters`, slot chunking, and explanation output.
+Use `GET /api/availability/slots` for the minimal query-string adapter over range, `resourceIds`, `orGroups`, and ancestor expansion.
+Use `docs/management/webapi.md` for the management HTTP surface.
+`/health` is the readiness endpoint, while `/api/demo/*` and `/api/diag/*` are ancillary endpoints rather than the main public API surface.
 
 ---
 
@@ -647,7 +605,7 @@ The Availability page allows you to:
 - select a time range (UTC)
 - set slot duration (`slotMinutes`)
 - combine resources (AND / OR)
-- apply grouped property filters, including descendant-aware matching (`includeDescendants`)
+- apply grouped property filters, including descendant-aware matching (`includePropertyDescendants`)
 - apply ancestor-aware constraints (`includeResourceAncestors`)
 - include or exclude remainder slots
 
@@ -703,4 +661,8 @@ The project is designed to be integrated, extended, and maintained over time wit
 
 # License
 
-Apache-2.0. See `LICENSE`.
+Apache-2.0. See [LICENSE](LICENSE).
+
+
+
+
