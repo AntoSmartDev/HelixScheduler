@@ -1,4 +1,4 @@
-namespace HelixScheduler.Application.Demo;
+﻿namespace HelixScheduler.Infrastructure.Persistence.Seed;
 
 public sealed record DemoScenarioState(
     DateOnly BaseDateUtc,

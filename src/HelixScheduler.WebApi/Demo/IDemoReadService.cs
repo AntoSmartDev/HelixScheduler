@@ -1,4 +1,4 @@
-namespace HelixScheduler.Application.Demo;
+﻿namespace HelixScheduler.WebApi.Demo;
 
 public interface IDemoReadService
 {

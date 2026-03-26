@@ -1,4 +1,4 @@
-using HelixScheduler.Application.Demo;
+﻿using HelixScheduler.Infrastructure.Persistence.Seed;
 
 namespace HelixScheduler.Infrastructure.Startup;
 

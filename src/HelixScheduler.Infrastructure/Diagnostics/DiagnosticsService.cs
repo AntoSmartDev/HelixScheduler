@@ -1,5 +1,4 @@
-using HelixScheduler.Application.Diagnostics;
-using HelixScheduler.Infrastructure.Persistence;
+﻿using HelixScheduler.Infrastructure.Persistence;
 using HelixScheduler.Infrastructure.Persistence.QueryServices;
 using Microsoft.EntityFrameworkCore;
 

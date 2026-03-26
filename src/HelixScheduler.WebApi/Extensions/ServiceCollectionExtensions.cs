@@ -1,17 +1,17 @@
-using HelixScheduler.Application.Abstractions;
+﻿using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.Management.BusyEvents;
 using HelixScheduler.Application.Management.CatalogRead;
-using HelixScheduler.Application.Demo;
 using HelixScheduler.Application.Management.Hierarchy;
 using HelixScheduler.Application.Management.Properties;
-using HelixScheduler.Application.Management.Validation;
-using HelixScheduler.Application.PropertySchema;
-using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Application.Management.ResourceCatalog;
 using HelixScheduler.Application.Management.Rules;
 using HelixScheduler.Application.Management.Tenants;
+using HelixScheduler.Application.Management.Validation;
+using HelixScheduler.Application.PropertySchema;
+using HelixScheduler.Application.ResourceCatalog;
 using HelixScheduler.Core;
+using HelixScheduler.WebApi.Demo;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HelixScheduler.WebApi.Extensions;
@@ -42,5 +42,3 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
-
-

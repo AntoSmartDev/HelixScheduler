@@ -1,4 +1,4 @@
-﻿using HelixScheduler.Application.Diagnostics;
+﻿using HelixScheduler.Infrastructure.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HelixScheduler.WebApi.Controllers;
@@ -30,4 +30,3 @@ public sealed class DiagController : ControllerBase
         return properties.ToList();
     }
 }
-

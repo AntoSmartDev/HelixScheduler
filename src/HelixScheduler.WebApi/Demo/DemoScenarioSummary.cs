@@ -1,6 +1,6 @@
-using HelixScheduler.Application.Availability;
+﻿using HelixScheduler.Application.Availability;
 
-namespace HelixScheduler.Application.Demo;
+namespace HelixScheduler.WebApi.Demo;
 
 public sealed record DemoScenarioSummary(
     IReadOnlyList<ResourceSummary> Resources,

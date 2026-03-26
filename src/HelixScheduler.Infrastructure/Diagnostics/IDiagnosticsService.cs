@@ -1,4 +1,4 @@
-namespace HelixScheduler.Application.Diagnostics;
+﻿namespace HelixScheduler.Infrastructure.Diagnostics;
 
 public interface IDiagnosticsService
 {

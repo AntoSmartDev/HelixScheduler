@@ -1,32 +1,29 @@
-using HelixScheduler.Application.Abstractions;
+﻿using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Application.Availability.Orchestration;
 using HelixScheduler.Application.Availability.QueryServices;
-using HelixScheduler.Application.Demo;
-using HelixScheduler.Application.Diagnostics;
 using HelixScheduler.Application.Management.BusyEvents;
+using HelixScheduler.Application.Management.Hierarchy;
+using HelixScheduler.Application.Management.Properties;
+using HelixScheduler.Application.Management.ResourceCatalog;
+using HelixScheduler.Application.Management.Rules;
+using HelixScheduler.Application.Management.Tenants;
 using HelixScheduler.Application.Management.Validation;
 using HelixScheduler.Application.PropertySchema;
-using HelixScheduler.Application.Management.Properties;
-using HelixScheduler.Application.Management.Rules;
 using HelixScheduler.Application.ResourceCatalog;
-using HelixScheduler.Application.Management.ResourceCatalog;
-using HelixScheduler.Application.Management.Hierarchy;
-using HelixScheduler.Application.Management.Tenants;
-using HelixScheduler.Application.Startup;
 using HelixScheduler.Infrastructure.Diagnostics;
 using HelixScheduler.Infrastructure.Persistence;
 using HelixScheduler.Infrastructure.Persistence.QueryServices;
-using HelixScheduler.Infrastructure.Persistence.Stores;
 using HelixScheduler.Infrastructure.Persistence.Seed;
+using HelixScheduler.Infrastructure.Persistence.Stores;
+using HelixScheduler.Infrastructure.Persistence.Stores.Management.BusyEvents;
+using HelixScheduler.Infrastructure.Persistence.Stores.Management.Rules;
+using HelixScheduler.Infrastructure.Persistence.Stores.Management.Tenants;
+using HelixScheduler.Infrastructure.Persistence.Stores.Management.Validation;
 using HelixScheduler.Infrastructure.Startup;
 using HelixScheduler.Infrastructure.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using HelixScheduler.Infrastructure.Persistence.Stores.Management.BusyEvents;
-using HelixScheduler.Infrastructure.Persistence.Stores.Management.Rules;
-using HelixScheduler.Infrastructure.Persistence.Stores.Management.Validation;
-using HelixScheduler.Infrastructure.Persistence.Stores.Management.Tenants;
 
 namespace HelixScheduler.Infrastructure;
 
@@ -78,5 +75,3 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
-
-

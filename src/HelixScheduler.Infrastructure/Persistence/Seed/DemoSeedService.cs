@@ -1,5 +1,4 @@
-using HelixScheduler.Application.Abstractions;
-using HelixScheduler.Application.Demo;
+﻿using HelixScheduler.Application.Abstractions;
 
 namespace HelixScheduler.Infrastructure.Persistence.Seed;
 

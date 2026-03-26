@@ -1,4 +1,4 @@
-namespace HelixScheduler.Application.Startup;
+﻿namespace HelixScheduler.Infrastructure.Startup;
 
 public interface IStartupInitializer
 {

@@ -1,4 +1,5 @@
-﻿using HelixScheduler.Application.Demo;
+﻿using HelixScheduler.WebApi.Demo;
+using HelixScheduler.Infrastructure.Persistence.Seed;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HelixScheduler.WebApi.Controllers;
@@ -49,4 +50,3 @@ public sealed class DemoController : ControllerBase
         return NoContent();
     }
 }
-

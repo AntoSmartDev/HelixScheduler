@@ -1,7 +1,7 @@
-using HelixScheduler.Application.Availability;
+﻿using HelixScheduler.Application.Availability;
 using HelixScheduler.Application.Availability.QueryServices;
 
-namespace HelixScheduler.Application.Demo;
+namespace HelixScheduler.WebApi.Demo;
 
 // Demo composes canonical availability summary capabilities; it does not own them.
 public sealed class DemoReadService : IDemoReadService
@@ -51,4 +51,3 @@ public sealed class DemoReadService : IDemoReadService
         return new DemoScenarioSummary(resources, rules, busy);
     }
 }
-

@@ -1,7 +1,7 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
-using HelixScheduler.Application.Startup;
 using HelixScheduler.Infrastructure.Persistence;
+using HelixScheduler.Infrastructure.Startup;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

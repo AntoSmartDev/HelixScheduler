@@ -1,5 +1,4 @@
-using HelixScheduler.Application.Abstractions;
-using HelixScheduler.Application.Demo;
+﻿using HelixScheduler.Application.Abstractions;
 using HelixScheduler.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 

@@ -1,6 +1,4 @@
-using HelixScheduler.Application.Startup;
-
-namespace HelixScheduler.Infrastructure.Startup;
+﻿namespace HelixScheduler.Infrastructure.Startup;
 
 public sealed class StartupInitializer : IStartupInitializer
 {
