@@ -1,13 +1,13 @@
-using HelixScheduler.Infrastructure.Persistence;
+﻿using HelixScheduler.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HelixScheduler.Infrastructure.Startup;
+namespace HelixScheduler.Infrastructure.SqlServer;
 
-internal sealed class DatabaseInitializer : IDatabaseInitializer
+internal sealed class SqlServerDatabaseInitializer : ISqlServerDatabaseInitializer
 {
     private readonly SchedulerDbContext _dbContext;
 
-    public DatabaseInitializer(SchedulerDbContext dbContext)
+    public SqlServerDatabaseInitializer(SchedulerDbContext dbContext)
     {
         _dbContext = dbContext;
     }

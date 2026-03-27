@@ -1,13 +1,15 @@
-﻿namespace HelixScheduler.Infrastructure.Startup;
+﻿using HelixScheduler.Infrastructure.SqlServer;
 
-public sealed class StartupInitializer : IStartupInitializer
+namespace HelixScheduler.Infrastructure.Startup;
+
+internal sealed class StartupInitializer : IStartupInitializer
 {
-    private readonly IDatabaseInitializer _databaseInitializer;
+    private readonly ISqlServerDatabaseInitializer _databaseInitializer;
     private readonly ITenantBootstrapper _tenantBootstrapper;
     private readonly IDemoSeedInitializer _demoSeedInitializer;
 
     public StartupInitializer(
-        IDatabaseInitializer databaseInitializer,
+        ISqlServerDatabaseInitializer databaseInitializer,
         ITenantBootstrapper tenantBootstrapper,
         IDemoSeedInitializer demoSeedInitializer)
     {

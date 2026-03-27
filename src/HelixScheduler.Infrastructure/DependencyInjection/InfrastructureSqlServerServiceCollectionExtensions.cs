@@ -1,4 +1,5 @@
-using HelixScheduler.Infrastructure.Persistence;
+﻿using HelixScheduler.Infrastructure.Persistence;
+using HelixScheduler.Infrastructure.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +15,8 @@ internal static class InfrastructureSqlServerServiceCollectionExtensions
         {
             options.UseSqlServer(connectionString);
         });
+
+        services.AddScoped<ISqlServerDatabaseInitializer, SqlServerDatabaseInitializer>();
 
         return services;
     }
