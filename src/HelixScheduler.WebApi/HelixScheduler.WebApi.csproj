@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -17,6 +17,7 @@
     <ProjectReference Include="..\HelixScheduler.Application\HelixScheduler.Application.csproj" />
     <ProjectReference Include="..\HelixScheduler.Core\HelixScheduler.Core.csproj" />
     <ProjectReference Include="..\HelixScheduler.Infrastructure\HelixScheduler.Infrastructure.csproj" />
+    <ProjectReference Include="..\HelixScheduler.Infrastructure.SqlServer\HelixScheduler.Infrastructure.SqlServer.csproj" />
   </ItemGroup>
 
 </Project>

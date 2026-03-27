@@ -1,4 +1,4 @@
-<Solution>
+﻿<Solution>
   <Folder Name="/samples/">
     <Project Path="samples/HelixScheduler.DemoWeb/HelixScheduler.DemoWeb.csproj" />
   </Folder>
@@ -12,6 +12,7 @@
     <Project Path="src/HelixScheduler.WebApi/HelixScheduler.WebApi.csproj" />
     <Project Path="src/HelixScheduler.Application/HelixScheduler.Application.csproj" />
     <Project Path="src/HelixScheduler.Infrastructure/HelixScheduler.Infrastructure.csproj" />
+    <Project Path="src/HelixScheduler.Infrastructure.SqlServer/HelixScheduler.Infrastructure.SqlServer.csproj" />
   </Folder>
 
   <Folder Name="/tests/">

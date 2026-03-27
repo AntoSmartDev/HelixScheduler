@@ -1,19 +1,20 @@
 ﻿using HelixScheduler.Infrastructure.Persistence;
-using HelixScheduler.Infrastructure.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace HelixScheduler.Infrastructure.DependencyInjection;
+namespace HelixScheduler.Infrastructure.SqlServer.DependencyInjection;
 
 internal static class InfrastructureSqlServerServiceCollectionExtensions
 {
-    public static IServiceCollection AddHelixSchedulerInfrastructureSqlServer(
+    public static IServiceCollection AddHelixSchedulerInfrastructureSqlServerProvider(
         this IServiceCollection services,
         string connectionString)
     {
         services.AddDbContext<SchedulerDbContext>(options =>
         {
-            options.UseSqlServer(connectionString);
+            options.UseSqlServer(
+                connectionString,
+                sqlServer => sqlServer.MigrationsAssembly(typeof(ServiceCollectionExtensions).Assembly.GetName().Name));
         });
 
         services.AddScoped<ISqlServerDatabaseInitializer, SqlServerDatabaseInitializer>();

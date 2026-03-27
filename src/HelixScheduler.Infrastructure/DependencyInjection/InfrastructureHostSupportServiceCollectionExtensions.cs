@@ -15,7 +15,6 @@ internal static class InfrastructureHostSupportServiceCollectionExtensions
         services.AddScoped<IDiagnosticsService, DiagnosticsService>();
         services.AddScoped<IDemoScenarioStore, DemoScenarioStore>();
         services.AddScoped<IDemoSeedService, DemoSeedService>();
-        services.AddScoped<IStartupInitializer, StartupInitializer>();
 
         return services;
     }

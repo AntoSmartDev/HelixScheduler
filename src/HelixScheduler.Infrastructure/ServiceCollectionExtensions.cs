@@ -1,24 +1,14 @@
-using HelixScheduler.Infrastructure.DependencyInjection;
-using HelixScheduler.Infrastructure.Persistence;
-using Microsoft.Extensions.Configuration;
+﻿using HelixScheduler.Infrastructure.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HelixScheduler.Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddHelixSchedulerInfrastructure(
-        this IServiceCollection services,
-        IConfiguration cfg)
+    public static IServiceCollection AddHelixSchedulerInfrastructureCommon(
+        this IServiceCollection services)
     {
-        var connectionString = cfg.GetConnectionString("SchedulerDb");
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("ConnectionStrings:SchedulerDb is required.");
-        }
-
         services
-            .AddHelixSchedulerInfrastructureSqlServer(connectionString)
             .AddHelixSchedulerInfrastructureSharedSubstrate()
             .AddHelixSchedulerInfrastructureHostSupport();
 

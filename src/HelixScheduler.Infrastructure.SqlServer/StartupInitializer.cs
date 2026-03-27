@@ -1,6 +1,7 @@
-﻿using HelixScheduler.Infrastructure.SqlServer;
+﻿using HelixScheduler.Infrastructure.Persistence.Seed;
+using HelixScheduler.Infrastructure.Startup;
 
-namespace HelixScheduler.Infrastructure.Startup;
+namespace HelixScheduler.Infrastructure.SqlServer;
 
 internal sealed class StartupInitializer : IStartupInitializer
 {

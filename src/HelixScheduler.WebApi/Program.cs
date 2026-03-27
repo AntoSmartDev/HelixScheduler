@@ -1,4 +1,4 @@
-﻿using HelixScheduler.Infrastructure;
+﻿using HelixScheduler.Infrastructure.SqlServer;
 using HelixScheduler.WebApi.Extensions;
 using HelixScheduler.WebApi.Tenancy;
 
@@ -19,7 +19,7 @@ builder.Services.AddOpenApi(options =>
 {
     HelixScheduler.WebApi.Management.ManagementOpenApiConfiguration.Configure(options);
 });
-builder.Services.AddHelixSchedulerInfrastructure(builder.Configuration);
+builder.Services.AddHelixSchedulerInfrastructureSqlServer(builder.Configuration);
 builder.Services.AddHelixSchedulerWebApi();
 
 var app = builder.Build();
@@ -70,4 +70,3 @@ app.MapGet("/", () =>
 app.MapControllers();
 
 app.Run();
-
