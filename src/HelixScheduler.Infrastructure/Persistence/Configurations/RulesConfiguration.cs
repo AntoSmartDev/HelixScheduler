@@ -56,7 +56,6 @@ public sealed class RulesConfiguration : IEntityTypeConfiguration<Rules>
             .HasForeignKey(rule => rule.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(rule => new { rule.TenantId, rule.FromDateUtc, rule.ToDateUtc, rule.SingleDateUtc })
-            .IncludeProperties(rule => rule.IsExclude);
+        builder.HasIndex(rule => new { rule.TenantId, rule.FromDateUtc, rule.ToDateUtc, rule.SingleDateUtc });
     }
 }
