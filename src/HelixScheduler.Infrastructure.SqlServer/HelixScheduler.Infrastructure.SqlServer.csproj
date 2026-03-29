@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
     <PackageId>HelixScheduler.Infrastructure.SqlServer</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <Authors>Antonio Angiò (AntoSmartDev)</Authors>
     <Description>SQL Server provider integration for HelixScheduler.Infrastructure, including provider wiring, migrations, and SQL Server-specific migration bootstrap.</Description>
     <PackageTags>scheduling;availability;sql-server;ef-core;migrations;provider</PackageTags>
-    <PackageReleaseNotes>First public package release of HelixScheduler.Infrastructure.SqlServer.</PackageReleaseNotes>
+    <PackageReleaseNotes>Patch release fixing SQL Server migration integrity on empty database bootstrap.</PackageReleaseNotes>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/AntoSmartDev/HelixScheduler</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
