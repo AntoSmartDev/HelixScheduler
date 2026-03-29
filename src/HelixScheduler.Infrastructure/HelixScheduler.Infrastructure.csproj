@@ -4,6 +4,17 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>HelixScheduler.Infrastructure</PackageId>
+    <Version>2.0.0</Version>
+    <Authors>Antonio Angiò (AntoSmartDev)</Authors>
+    <Description>Shared EF Core persistence substrate for HelixScheduler.Application, including SchedulerDbContext, entities, configurations, query services, stores, and tenancy runtime support.</Description>
+    <PackageTags>scheduling;availability;ef-core;persistence;tenancy;stores;query-services</PackageTags>
+    <PackageReleaseNotes>First public package release of HelixScheduler.Infrastructure.</PackageReleaseNotes>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/AntoSmartDev/HelixScheduler</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/AntoSmartDev/HelixScheduler</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +24,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HelixScheduler.Application\HelixScheduler.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
