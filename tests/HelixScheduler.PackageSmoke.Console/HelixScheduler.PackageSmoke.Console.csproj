@@ -9,9 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HelixScheduler.Application" Version="2.0.0" />
-    <PackageReference Include="HelixScheduler.Infrastructure" Version="2.0.0" />
-    <PackageReference Include="HelixScheduler.Infrastructure.SqlServer" Version="2.0.0" />
+    <PackageReference Include="HelixScheduler.Core" Version="2.0.1" />
+    <PackageReference Include="HelixScheduler.Application" Version="2.0.1" />
+    <PackageReference Include="HelixScheduler.Infrastructure" Version="2.0.1" />
+    <PackageReference Include="HelixScheduler.Infrastructure.SqlServer" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
   </ItemGroup>

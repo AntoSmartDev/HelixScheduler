@@ -5,11 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>HelixScheduler.Core</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <Authors>Antonio Angiò (AntoSmartDev)</Authors>
     <Description>Deterministic, domain-agnostic scheduling and availability engine core for modern .NET.</Description>
     <PackageTags>scheduling;availability;booking;planning;rules;busy-slots</PackageTags>
-    <PackageReleaseNotes>First public package release of HelixScheduler.Core.</PackageReleaseNotes>
+    <PackageReleaseNotes>Patch release aligned with the 2.0.1 package family for the application stack.</PackageReleaseNotes>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/AntoSmartDev/HelixScheduler</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
