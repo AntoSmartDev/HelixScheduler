@@ -1,4 +1,4 @@
-﻿<Solution>
+<Solution>
   <Folder Name="/samples/">
     <Project Path="samples/HelixScheduler.DemoWeb/HelixScheduler.DemoWeb.csproj" />
   </Folder>
@@ -18,7 +18,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/HelixScheduler.Core.Tests/HelixScheduler.Core.Tests.csproj" />
     <Project Path="tests/HelixScheduler.WebApi.Tests/HelixScheduler.WebApi.Tests.csproj" />
-    <Project Path="tests/HelixScheduler.PackageSmoke.Console/HelixScheduler.PackageSmoke.Console.csproj" />
   </Folder>
 </Solution>
 
